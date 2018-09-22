@@ -1414,7 +1414,7 @@ BlockMatMul1DExec::BlockMatMul1DExec(
       for (long i =0; i< d; i++) {
         if (zMStar.genToPow(dim,D) == zMStar.genToPow(-1, i)) k = i;
       }
-	}
+    }
 
     ea.dispatch<BlockMatMul1DExec_construct>(mat, cache.multiplier, strategy, k, g);
 }
@@ -1496,7 +1496,7 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
 
   vector<Ctxt> acc(d1, Ctxt(ZeroCtxtLike, ctxt));
 
-  if (1) {
+  if (iterative0) {
     if (g) { // BSGS
       Ctxt sh_ctxt(ctxt);
       vector<Ctxt> baby_steps(g, Ctxt(ZeroCtxtLike, ctxt)); //// baby_steps[s] = rot(or sigma)^s(v) for j in [0..g).
