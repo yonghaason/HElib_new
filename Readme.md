@@ -29,8 +29,8 @@ e.g) 바뀐 파일들: EncryptedArray, PAlgebra, matmul.
 
 - 09/24: Key 생성은, Test_matmul.cpp 파일 중간에 add1DMatrices 등등부터 시작해서 좀 뜯어보면 되지 않을까 싶은데 좀더 찾아보겠습니다.
 
-### Summation 나누기
+- ks_strategy = 0 인 경우 addAllMatrices(secretKey);를 이용하여 모든 ks matrice를 추가하도록 하였고 이를 이용해서 새로운 BSGS 구현
 
-- 원래 있는 precon class들로 처리할 수 있는지 확인
+- 분기 나누기가 애매해서 일단 이전 코드들은 주석처리 해놓음
 
-- 아니면 새로 만들기
+
