@@ -99,7 +99,8 @@ void TestIt(FHEcontext& context, long dim, bool verbose, long full, long block)
   // we call addSomeFrbMatrices for all strategies except minimal
 
   switch (ks_strategy) {
-  case 0: 
+  case 0:
+	addAllMatrices(secretKey);
     addSome1DMatrices(secretKey);
     addSomeFrbMatrices(secretKey);
     break;

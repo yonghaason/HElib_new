@@ -1479,7 +1479,9 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
        AvailableThreads() == 1)
       iterative1 = true;
 
+  long h = divc(D, g);
   vector<Ctxt> acc(d1, Ctxt(ZeroCtxtLike, ctxt));
+  vector<Ctxt> acc2(d*h, Ctxt(ZeroCtxtLike, ctxt));
 
   if (iterative0) {
     if (g) { // BSGS
@@ -1522,6 +1524,7 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
   }
  else { // hoisting
   	 if (g) {
+  		 /* 
   	    long h = divc(D, g);
 	    vector<shared_ptr<Ctxt>> baby_steps(g);
 	    GenBabySteps(baby_steps, ctxt, dim, true);
@@ -1553,7 +1556,24 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
 	   	    acc[l] = acc2[0];
 	   	    for (long i: range(1, cnt)) acc[l] += acc2[i];   
 	    }
-     }
+       */
+ 	    vector<shared_ptr<Ctxt>> baby_steps(g);
+ 	    GenBabySteps(baby_steps, ctxt, dim, true);
+ 	    for(long j: range(d))
+ 	    {
+ 	    	for(long k: range(h))	
+ 	    	{
+ 	    		for(long l: range(g))
+ 	    		{
+ 	    			long i = g*k + l;
+ 	    			if(i >= D) break;
+ 	    			MulAdd(acc2[j+d*k], cache.multiplier[i*d+j],*baby_steps[l]);
+ 	    		}
+ 	    	}
+ 	    }
+ 	    
+  		
+  	 }
      else {
 	     shared_ptr<GeneralAutomorphPrecon> precon = buildGeneralAutomorphPrecon(ctxt, dim0, ea);
     	 long par_buf_sz = 1;
@@ -1579,8 +1599,9 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
 		         	 MulAdd(acc[j], cache.multiplier[i*d1+j], *par_buf[i-first_i]);
 	        	 }
 	      	 }
+		     
+		     NTL_EXEC_RANGE_END
     	 } 
-  	 NTL_EXEC_RANGE_END
   	 }
 	}
 
@@ -1594,6 +1615,7 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
     ctxt = sum;
   }
   else {
+	/*
     PartitionInfo pinfo(d1);
     long cnt = pinfo.NumIntervals();
     vector<Ctxt> sum(cnt, Ctxt(ZeroCtxtLike, ctxt));
@@ -1609,6 +1631,18 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
     NTL_EXEC_INDEX_END
 	  ctxt = sum[0];
     for (long i: range(1, cnt)) ctxt += sum[i];
+    */
+	 Ctxt sum(ZeroCtxtLike, ctxt);	  
+	 for(long j: range(d))
+	  {
+		  for(long k: range(h))
+		  {
+			  acc2[j+d*k].smartAutomorph(zMStar.genToPow(dim1, j)*zMStar.genToPow(dim0, g*k));
+			  sum += acc2[j+d*k];
+		  }
+	  }
+	  ctxt = sum;
+	  
   }
 }
    
