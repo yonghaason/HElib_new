@@ -1413,7 +1413,7 @@ BlockMatMul1DExec::BlockMatMul1DExec(
     if (!bsgs)
        g = 0; // do not use BSGS
     else
-       g = sqrt(D*d); // use BSGS
+       g = NewKSGiantStepSize(D, d); // use BSGS
 
     if (D >= d) 
       strategy = +1;
@@ -1524,8 +1524,7 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
   }
  else { // hoisting
   	 if (g) {
-  	 	cout << "enter here" << endl;
-  		 /* 
+  	 	 /* 
   	    long h = divc(D, g);
 	    vector<shared_ptr<Ctxt>> baby_steps(g);
 	    GenBabySteps(baby_steps, ctxt, dim, true);
@@ -1571,9 +1570,7 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
  	    			MulAdd(acc2[j+d*k], cache.multiplier[i*d+j], *baby_steps[l]);
  	    		}
  	    	}
- 	    }
- 	    
-  		
+ 	    }  		
   	 }
      else {
 	     shared_ptr<GeneralAutomorphPrecon> precon = buildGeneralAutomorphPrecon(ctxt, dim0, ea);

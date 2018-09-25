@@ -100,7 +100,7 @@ void TestIt(FHEcontext& context, long dim, bool verbose, long full, long block)
 
   switch (ks_strategy) {
   case 0:
-	addAllMatrices(secretKey);
+	  addAllMatrices(secretKey);
     addSome1DMatrices(secretKey);
     addSomeFrbMatrices(secretKey);
     break;
@@ -115,6 +115,10 @@ void TestIt(FHEcontext& context, long dim, bool verbose, long full, long block)
   case 3: 
     addMinimal1DMatrices(secretKey);
     addMinimalFrbMatrices(secretKey);
+    break;
+  case 4:
+    addSomeFrbMatrices(secretKey);
+    addNewBSGSMatrices(secretKey);
     break;
 
    default:
@@ -200,7 +204,7 @@ int main(int argc, char *argv[])
   amap.arg("force_hoist", fhe_test_force_hoist, 
            "-1 to force off"); 
   amap.arg("ks_strategy", ks_strategy,
-           "0: default, 1:full, 2:bsgs, 3:minimal"); 
+           "0: default, 1:full, 2:bsgs, 3:minimal, 4:working"); 
 
   long full = 0; 
   amap.arg("full", full, "0: 1D, 1: full");

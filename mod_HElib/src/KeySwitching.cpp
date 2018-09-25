@@ -27,6 +27,14 @@ long KSGiantStepSize(long D)
   return g;
 }
 
+long NewKSGiantStepSize(long D, long d)
+{ 
+  assert(D > 0 && d > 0);
+  long g = SqrRoot(D/d);
+  if (g*g < D/d) g++; // TODO: Necessary?
+  return g;
+}
+
 // A maximalistic approach: generate matrices s(X^e)->s(X) for all e \in Zm*
 void addAllMatrices(FHESecKey& sKey, long keyID)
 {
@@ -372,6 +380,45 @@ void addMinimalFrbMatrices(FHESecKey& sKey, long keyID)
   const FHEcontext &context = sKey.getContext();
   addMinimal1Dmats4dim(sKey, -1, keyID);
   sKey.setKeySwitchMap(); // re-compute the key-switching map
+}
+
+static void addNewBSGSmats4dim(FHESecKey& sKey, long i, long keyID)
+{
+  const PAlgebra& zMStar = sKey.getContext().zMStar;
+  long m;
+  long ord;
+  long ordP;
+
+  m = zMStar.getM();
+  ord = zMStar.OrderOf(i);
+  ordP = zMStar.getOrdP();
+
+  long g = NewKSGiantStepSize(ord, ordP);
+
+  // baby steps
+  for (long j = 1; j < g; j++) {
+    for (long k = 1; k < ordP; k++) {
+      sKey.GenKeySWmatrix(1, MulMod(zMStar.genToPow(i, j), zMStar.genToPow(-1, k), m), keyID, keyID);
+    }
+  }
+  // giant steps
+  for (long j = g; j < ord; j += g)
+    sKey.GenKeySWmatrix(1, zMStar.genToPow(i, j), keyID, keyID);
+
+  sKey.setKSStrategy(i, FHE_KSS_NEW);
+}
+
+// Generate Matrices for new BSGS
+void addNewBSGSMatrices(FHESecKey& sKey, long bound, long keyID)
+{
+  const FHEcontext &context = sKey.getContext();
+  for (long i: range(context.zMStar.numOfGens())) {
+    if (bound >= context.zMStar.OrderOf(i))
+      addSome1Dmats4dim(sKey, i, bound, keyID);
+    else
+      addNewBSGSmats4dim(sKey, i, keyID);
+  }
+  sKey.setKeySwitchMap();
 }
 
 // Generate all key-switching matrices for a given permutation network

@@ -130,6 +130,8 @@ ostream& operator<<(ostream& str, const KeySwitch& matrix);
 #define FHE_KSS_MIN     (3)
 // minimal strategy (for g_i, and for g_i^{-ord_i} for bad dims)
 
+#define FHE_KSS_NEW     (4)
+
 
 
 /**
@@ -363,6 +365,7 @@ public:
 //! @brief Function that returns number of baby steps.  Used to keep
 //! this and matmul routines "in sync".
 long KSGiantStepSize(long D);
+long NewKSGiantStepSize(long D, long d);
 
 //! @brief Maximalistic approach:
 //! generate matrices s(X^e)->s(X) for all e in Zm*
@@ -399,6 +402,9 @@ inline void addBSGSFrbMatrices(FHESecKey& sKey, long keyID=0)
 //! These routines just add a single matrix (or two, for bad dimensions)
 void addMinimal1DMatrices(FHESecKey& sKey, long keyID=0);
 void addMinimalFrbMatrices(FHESecKey& sKey, long keyID=0);
+
+//! @brief Key Switching for our new method
+void addNewBSGSMatrices(FHESecKey& sKey, long bound=FHE_KEYSWITCH_MIN_THRESH, long keyID=0);
 
 //! Generate all key-switching matrices for a given permutation network
 class PermNetwork;
