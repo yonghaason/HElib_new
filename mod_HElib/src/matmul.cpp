@@ -1333,7 +1333,7 @@ struct BlockMatMul1DExec_construct {
       for (long i: range(D)) {
         bool zero = mat.processDiagonal(poly, i, ea);
         if (zero) {
-          for (long j: range(d)) vec [i*d+j] = nullptr;
+          for (long j: range(d)) vec[i*d+j] = nullptr;
         }
         else {
           long s = i % g; // i == s+g*k
@@ -1524,6 +1524,7 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
   }
  else { // hoisting
   	 if (g) {
+  	 	cout << "enter here" << endl;
   		 /* 
   	    long h = divc(D, g);
 	    vector<shared_ptr<Ctxt>> baby_steps(g);
@@ -1567,7 +1568,7 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
  	    		{
  	    			long i = g*k + l;
  	    			if(i >= D) break;
- 	    			MulAdd(acc2[j+d*k], cache.multiplier[i*d+j],*baby_steps[l]);
+ 	    			MulAdd(acc2[j+d*k], cache.multiplier[i*d+j], *baby_steps[l]);
  	    		}
  	    	}
  	    }

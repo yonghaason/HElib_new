@@ -60,6 +60,8 @@ class PAlgebra {
 
   vector<long> gens; // Our generators for (Z/mZ)^* (other than p)
 
+  vector<long> offsets; // gens[i]^cube.getDim[i] = p^offsets[i]
+
   //  native[i] is true iff gens[i] has the same order in the quotient
   //  group as its order in Zm*. 
   //  VJS: I changed this from a Vec<GF2> to Vec<bool>.
@@ -127,7 +129,7 @@ class PAlgebra {
   //! The number of generators in (Z/mZ)^* /(p)
   unsigned long numOfGens() const { return gens.size(); }
 
-  unsigned long numOfFrob(long i) const;
+  long numOfFrob(long i) const { return offsets[i]; };
 
   //! the i'th generator in (Z/mZ)^* /(p) (if any)
   unsigned long ZmStarGen(unsigned long i) const

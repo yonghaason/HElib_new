@@ -104,7 +104,7 @@ void PAlgebra::printout() const
 
 
 PAlgebra::PAlgebra(unsigned long mm, unsigned long pp,  
-                   const vector<long>& _gens, const vector<long>& _ords )
+                   const vector<long>& _gens, const vector<long>& _ords)
 {
   assert( ProbPrime(pp) );
   assert( (mm % pp) != 0 );
@@ -139,12 +139,24 @@ PAlgebra::PAlgebra(unsigned long mm, unsigned long pp,
 
   // Record for each generator gi whether it has the same order in
   // ZM* as in Zm* /(p,g1,...,g_{i-1})
+  // And record how many frob maps are required in the offsets vector 
   resize(native, lsize(tmpOrds));
   for (long j=0; j<lsize(tmpOrds); j++) {
     native[j] = (tmpOrds[j]>0);
     tmpOrds[j] = abs(tmpOrds[j]);
   }
+
   cube.initSignature(tmpOrds); // set hypercume with these dimensions
+
+  resize(offsets, lsize(tmpOrds));
+  for (long j=0; j<lsize(tmpOrds); j++) {
+    unsigned long k=0;
+    while (k < this->ordP) {
+      if (genToPow(j, OrderOf(j)) == genToPow(-1, k)) break;
+      k++;
+    }
+    offsets[j] = k;
+  }
 
   phiM = ordP * getNSlots();
 
@@ -233,17 +245,17 @@ long PAlgebra::genToPow(long i, long j) const
   return res;
 }
 
-unsigned long PAlgebra::numOfFrob(long i) const  {
+// unsigned long PAlgebra::numOfFrob(long i) const  {
     
-    assert(i >= -1 && i < LONG(gens.size()));
-    long k = 0;
-    while (k < ordP) {
-      if (genToPow(i, OrderOf(i)) == genToPow(-1, k)) break;
-      k++;
-     }
+//     assert(i >= -1 && i < LONG(gens.size()));
+//     long k = 0;
+//     while (k < ordP) {
+//       if (genToPow(i, OrderOf(i)) == genToPow(-1, k)) break;
+//       k++;
+//      }
 
-     return k;
-  }
+//      return k;
+//   }
 /***********************************************************************
 
   PAlgebraMod stuff....
