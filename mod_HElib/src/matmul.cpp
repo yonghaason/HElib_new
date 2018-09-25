@@ -2060,8 +2060,6 @@ public:
 
   const EncryptedArray& getEA() const override { return ea_basetype; }
   long getDim() const override { return dim; }
-
-
 };
 
 
@@ -2151,8 +2149,6 @@ struct BlockMatMulFullExec_construct {
 
     rec_mul(0, 0, idxes, transforms, minimal, dims, ea_basetype, ea, mat);
   }
-
-
 };
 
 
