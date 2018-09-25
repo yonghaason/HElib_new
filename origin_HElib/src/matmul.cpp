@@ -1,4 +1,4 @@
-/* Copyright (C) 2012-2017 IBM Corp.xxxxxxxxxxxxxxx
+/* Copyright (C) 2012-2017 IBM Corp.
  * This program is Licensed under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at
@@ -14,7 +14,6 @@
 #include <algorithm>
 #include <NTL/BasicThreadPool.h>
 #include "matmul.h"
-
 
 int fhe_test_force_bsgs=0;
 int fhe_test_force_hoist=0;
@@ -763,6 +762,7 @@ void
 MatMul1DExec::mul(Ctxt& ctxt) const
 {
    FHE_NTIMER_START(mul_MatMul1DExec);
+
    assert(&ea.getContext() == &ctxt.getContext());
    const PAlgebra& zMStar = ea.getPAlgebra();
 
@@ -1114,42 +1114,35 @@ struct BlockMatMul1D_derived_impl {
                         const EncryptedArrayDerived<type>& ea,
                         const BlockMatMul1D_derived<type>& mat)
   {
-
-
-
     long dim = mat.getDim();
     long D = dimSz(ea, dim);
     long nslots = ea.size();
     long d = ea.getDegree();
 
-
     bool zDiag = true; // is this a zero diagonal?
-  //  long nzLast = -1;  // index of last non-zero entry
+    long nzLast = -1;  // index of last non-zero entry
 
     mat_R entry(INIT_SIZE, d, d);
     std::vector<RX> entry1(d);
-    std::vector< std::vector<RX> > tmpDiag(D),tmpDiag2(D);
+    std::vector< std::vector<RX> > tmpDiag(D);
 
     vector<vector<RX>> diag(nslots);
-
-    for (long jj: range(D)) {// clear from last nonzero entry
-              tmpDiag[jj].assign(d, RX());
-              tmpDiag2[jj].assign(d, RX());
-
-            }
 
     // Process the entries in this diagonal one at a time
     for (long j: range(D)) { // process entry j
       bool zEntry = mat.get(entry, mcMod(j-i, D), j, 0); // entry [j-i mod D, j]
       // get(...) returns true if the entry is empty, false otherwise
 
- //     if (!zEntry && IsZero(entry)) zEntry = true;// zero is an empty entry too
-   //   assert(zEntry || (entry.NumRows() == d && entry.NumCols() == d));
+      if (!zEntry && IsZero(entry)) zEntry = true;// zero is an empty entry too
+      assert(zEntry || (entry.NumRows() == d && entry.NumCols() == d));
 
-      if (1) {   // not a zero entry
-       // zDiag = false; // mark diagonal as non-empty
+      if (!zEntry) {   // not a zero entry
+        zDiag = false; // mark diagonal as non-empty
 
-	   //     nzLast = j; // current entry is the last nonzero one
+	for (long jj: range(nzLast+1, j)) {// clear from last nonzero entry
+          tmpDiag[jj].assign(d, RX());
+        }
+        nzLast = j; // current entry is the last nonzero one
 
         // recode entry as a vector of polynomials
         for (long k: range(d)) conv(entry1[k], entry[k]);
@@ -1158,42 +1151,18 @@ struct BlockMatMul1D_derived_impl {
 	ea.buildLinPolyCoeffs(tmpDiag[j], entry1);
       }
     }
+    if (zDiag) return true; // zero diagonal, nothing to do
 
-
-    //rotation by ...
-    for(long j:range(D)){
-    	if(j<=i-1)
-    	{
-    		for(long k:range(d)){
-    			tmpDiag2[j][k]=tmpDiag[j][(k+8)%d];
-
-    		}
-    	}
-    	else{
-    		tmpDiag2[j]=tmpDiag[j];
-
-    	}
-    }
-
-
-
-
- //   if (zDiag) return true; // zero diagonal, nothing to do
-/*
     // clear trailing zero entries
     for (long jj: range(nzLast+1, D)) {
-      tmpDiag2[jj].assign(d, RX());
+      tmpDiag[jj].assign(d, RX());
     }
-*/
-
 
     if (D==1) 
-       diag.assign(nslots, tmpDiag2[0]); // dimension of size one
-
+       diag.assign(nslots, tmpDiag[0]); // dimension of size one
     else {
-
       for (long j: range(nslots))
-        diag[j] = tmpDiag2[ ea.coordinate(dim,j) ];
+        diag[j] = tmpDiag[ ea.coordinate(dim,j) ];
            // rearrange the indexes based on the current dimension
     }
 
@@ -1202,7 +1171,7 @@ struct BlockMatMul1D_derived_impl {
     vector<RX> slots(nslots);
     poly.resize(d);
     for (long i: range(d)) {
-      for (long j: range(nslots)) {slots[j] = diag[j][i];}
+      for (long j: range(nslots)) slots[j] = diag[j][i];
       ea.encode(poly[i], slots);
     }
 
@@ -1346,17 +1315,13 @@ struct BlockMatMul1DExec_construct {
              vector<shared_ptr<ConstMultiplier>>& vec1,
              long strategy)
   {
-
     const BlockMatMul1D_partial<type>& mat =
       dynamic_cast< const BlockMatMul1D_partial<type>& >(mat_basetype);
-
 
     long dim = mat.getDim();
     long D = dimSz(ea, dim);
     long d = ea.getDegree();
     bool native = dimNative(ea, dim);
-
-
 
     RBak bak; bak.save(); ea.getTab().restoreContext();
 
@@ -1380,42 +1345,21 @@ struct BlockMatMul1DExec_construct {
         }
       }
       else {
-
         vec.resize(D*d);
         vec1.resize(D*d);
         for (long i: range(D)) {
-
           bool zero = mat.processDiagonal(poly, i, ea);
-
- 	  long j, k;
-  	    long g = KSGiantStepSize(D);
-               if (g) {
-                 j = i % g;
-                 k = i / g;
-               }
-               else {
-                 j = i;
-                 k = 1;
-               }
-               
-               for(long jj:range(d))
-               {
-                   plaintextAutomorph(poly[jj], poly[jj], dim, -g*k, ea);
-               }
-          
-
-
           if (zero) {
             for (long j: range(d)) {
               vec [i*d+j] = nullptr;
-              //vec1[i*d+j] = nullptr;
+              vec1[i*d+j] = nullptr;
             }
           }
           else {
-	 //   const RX& mask = ea.getTab().getMaskTable()[dim][i];
-	   // const RXModulus& F = ea.getTab().getPhimXMod();
+	    const RX& mask = ea.getTab().getMaskTable()[dim][i];
+	    const RXModulus& F = ea.getTab().getPhimXMod();
 
-          /*  for (long j: range(d)) {
+            for (long j: range(d)) {
               plaintextAutomorph(poly[j], poly[j], -1, -j, ea);
 
               RX poly1;
@@ -1424,19 +1368,10 @@ struct BlockMatMul1DExec_construct {
 
               sub(poly1, poly[j], poly1); // poly[j] w/ last D-i slots zeroed out
               vec1[i*d+j] = build_ConstMultiplier(poly1, dim, D, ea);
-
-            }*/
-       	    for (long j: range(d)) {
-              		      vec[i*d+j] = build_ConstMultiplier(poly[j], -1, -j, ea);
-              	//	      vec1[i*d+j] = build_ConstMultiplier(poly[j], -1, -j, ea);
-
-              		    }
-
-
+            }
           }
         }
       }
-
       break;
 
     case -1: // factor \rho
@@ -1487,10 +1422,9 @@ struct BlockMatMul1DExec_construct {
     default:
       Error("unknown strategy");
     }
-
-
-
+      
   }
+
 };
 
 
@@ -1498,7 +1432,6 @@ BlockMatMul1DExec::BlockMatMul1DExec(
   const BlockMatMul1D& mat, bool minimal)
   : ea(mat.getEA())
 {
-
     FHE_TIMER_START;
 
     dim = mat.getDim();
@@ -1512,10 +1445,8 @@ BlockMatMul1DExec::BlockMatMul1DExec(
     else
       strategy = -1;
 
-
     ea.dispatch<BlockMatMul1DExec_construct>(mat, cache.multiplier, 
                                         cache1.multiplier, strategy);
-
 }
 
 
@@ -1524,8 +1455,6 @@ BlockMatMul1DExec::BlockMatMul1DExec(
 void
 BlockMatMul1DExec::mul(Ctxt& ctxt) const
 {
-	cout<<"revised-block&full&bsgs\n";
-
    FHE_NTIMER_START(mul_BlockMatMul1DExec);
    assert(&ea.getContext() == &ctxt.getContext());
    const PAlgebra& zMStar = ea.getPAlgebra();
@@ -1694,10 +1623,9 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
       }
    }
    else {
+
       vector<Ctxt> acc(d1, Ctxt(ZeroCtxtLike, ctxt));
       vector<Ctxt> acc1(d1, Ctxt(ZeroCtxtLike, ctxt));
-
-
 
       if (iterative0) {
          Ctxt sh_ctxt(ctxt);
@@ -1709,53 +1637,47 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
             }
 	    for (long j: range(d1)) {
 	       MulAdd(acc[j], cache.multiplier[i*d1+j], sh_ctxt);
-	     //  MulAdd(acc1[j], cache1.multiplier[i*d1+j], sh_ctxt);
+	       MulAdd(acc1[j], cache1.multiplier[i*d1+j], sh_ctxt);
 	    }
          }
       }
       else {
-    	  
-    	long g = KSGiantStepSize(D);
-  	    long h = divc(D, g);
-	    vector<shared_ptr<Ctxt>> baby_steps(g);
-	    GenBabySteps(baby_steps, ctxt, dim, true);
 
-	    for(int l=0; l<d;l++)
-	    {
-	    	
-	    PartitionInfo pinfo(h);
-	   	    long cnt = pinfo.NumIntervals();
-	   	    vector<Ctxt> acc2(cnt, Ctxt(ZeroCtxtLike, ctxt));
+	 shared_ptr<GeneralAutomorphPrecon> precon =
+		  buildGeneralAutomorphPrecon(ctxt, dim0, ea);
 
-	   	    // parallel for loop: k in [0..h)
-	   	    NTL_EXEC_INDEX(cnt, index)
-	   	       long first, last;
-	   	       pinfo.interval(first, last, index);
+	 long par_buf_sz = 1;
+	 if (AvailableThreads() > 1) 
+	    par_buf_sz = min(d0, par_buf_max);
 
-	   	       for (long k: range(first, last)) {
-	   		  Ctxt acc_inner(ZeroCtxtLike, ctxt);
+	 vector<shared_ptr<Ctxt>> par_buf(par_buf_sz);
 
-	   		  for (long j: range(g)) {
-	   		     long i = j + g*k;
-	   		     if (i >= D) break;
-	   		     MulAdd(acc_inner, cache.multiplier[i*d1+l], *baby_steps[j]); 
-	   		  }
+	 for (long first_i = 0; first_i < d0; first_i += par_buf_sz) {
+	    long last_i = min(first_i + par_buf_sz, d0);
 
-	   		  if (k > 0) acc_inner.smartAutomorph(zMStar.genToPow(dim, g*k));
-	   		  acc2[index] += acc_inner;
-	   	       }
-	   	    NTL_EXEC_INDEX_END
+	    // for i in [first_i..last_i), generate automorphosm i and store
+	    // in par_buf[i-first_i]
 
-	   	    acc[l] = acc2[0];
-	   	    for (long i: range(1, cnt))
-	   	       acc[l] += acc2[i];
-	   	    
-	   	    
-	   	    
-	    }
+	    NTL_EXEC_RANGE(last_i-first_i, first, last) 
+     
+	       for (long idx: range(first, last)) {
+		 long i = idx + first_i;
+		 par_buf[idx] = precon->automorph(i);
+	       }
 
-	 
-	 
+	    NTL_EXEC_RANGE_END
+
+	    NTL_EXEC_RANGE(d1, first, last)
+
+	       for (long j: range(first, last)) {
+		  for (long i: range(first_i, last_i)) {
+		     MulAdd(acc[j], cache.multiplier[i*d1+j], *par_buf[i-first_i]);
+		     MulAdd(acc1[j], cache1.multiplier[i*d1+j], *par_buf[i-first_i]);
+		  }
+	       }
+
+	    NTL_EXEC_RANGE_END
+	 }
       }
 
       if (iterative1) {
@@ -1767,14 +1689,14 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
             sum.smartAutomorph(zMStar.genToPow(dim1, 1));
             sum.cleanUp();
             sum += acc[j];
-            //sum1.smartAutomorph(zMStar.genToPow(dim1, 1));
-            //sum1.cleanUp();
-            //sum1 += acc1[j];
+            sum1.smartAutomorph(zMStar.genToPow(dim1, 1));
+            sum1.cleanUp();
+            sum1 += acc1[j];
          }
 
-	 //sum1.smartAutomorph(zMStar.genToPow(dim, -D));
+	 sum1.smartAutomorph(zMStar.genToPow(dim, -D));
 	 ctxt = sum;
-       //  ctxt += sum1;
+         ctxt += sum1;
       }
       else {
 
@@ -1782,7 +1704,7 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
 	 long cnt = pinfo.NumIntervals();
 
 	 vector<Ctxt> sum(cnt, Ctxt(ZeroCtxtLike, ctxt));
-	 //vector<Ctxt> sum1(cnt, Ctxt(ZeroCtxtLike, ctxt));
+	 vector<Ctxt> sum1(cnt, Ctxt(ZeroCtxtLike, ctxt));
 
 	 // for j in [0..d1)
 	 NTL_EXEC_INDEX(cnt, index)
@@ -1791,18 +1713,18 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
 	    for (long j: range(first, last)) {
 	       if (j > 0) {
 		  acc[j].smartAutomorph(zMStar.genToPow(dim1, j));
-	//	  acc1[j].smartAutomorph(zMStar.genToPow(dim1, j));
+		  acc1[j].smartAutomorph(zMStar.genToPow(dim1, j));
 	       }
 	       sum[index] += acc[j];
-	  //     sum1[index] += acc1[j];
+	       sum1[index] += acc1[j];
 	    }
 	 NTL_EXEC_INDEX_END
 
 	 for (long i: range(1, cnt)) sum[0] += sum[i];
-	 //for (long i: range(1, cnt)) sum1[0] += sum1[i];
-	 //sum1[0].smartAutomorph(zMStar.genToPow(dim, -D));
+	 for (long i: range(1, cnt)) sum1[0] += sum1[i];
+	 sum1[0].smartAutomorph(zMStar.genToPow(dim, -D));
 	 ctxt = sum[0];
-	 //ctxt += sum1[0];
+	 ctxt += sum1[0];
       }
    }
 }
@@ -2115,20 +2037,17 @@ public:
   const EncryptedArray& ea_basetype;
   const BlockMatMulFull_derived<type>& mat;
   vector<long> init_idxes;
-  long total_idx;
   long dim;
-  vector<long> dims;
+
   BlockMatMulFullHelper(const EncryptedArray& _ea_basetype, 
                    const BlockMatMulFull_derived<type>& _mat,
                    const vector<long>& _init_idxes,
-                   long _dim, long _idx, vector<long> _dims)
+                   long _dim)
 
     : ea_basetype(_ea_basetype),
       mat(_mat),
       init_idxes(_init_idxes),
-      dim(_dim),
-  	  total_idx(_idx),
-	  dims(_dims)
+      dim(_dim) 
 
     { }
 
@@ -2136,16 +2055,7 @@ public:
   bool
   processDiagonal(vector<RX>& poly, long offset,
                   const EncryptedArrayDerived<type>& ea) const override
-  {	
-	 long tidx=total_idx;
-	 vector<long> rot_idx;
-	 for(int i=0;i<ea.dimension()-1;i++)
-	 {
-		 rot_idx.push_back(tidx%ea.sizeOfDimension(dims[ea.dimension()-2-i]));
-		 tidx=tidx/ea.sizeOfDimension(dims[ea.dimension()-2-i]);
-	 }
-	 long ext_frob[1]={1};
-	 
+  {
     vector<long> idxes;
     ea.EncryptedArrayBase::rotate1D(idxes, init_idxes, dim, offset);
 
@@ -2158,8 +2068,6 @@ public:
     std::vector<RX> entry1(d);
 
     vector<vector<RX>> diag(nslots);
-    vector<vector<RX>> temp(nslots);
-
 
     for (long j: range(nslots)) {
       long i = idxes[j];
@@ -2197,29 +2105,6 @@ public:
 
     vector<RX> slots(nslots);
     poly.resize(d);
-    
-    for(long j=0;j<nslots;j++)
-    {
-       for(long i=0;i<ea.dimension()-1;i++)
-       {
-       	temp[j]=diag[j];
-    	   if(ea.coordinate(dims[i],j)<=rot_idx[ea.dimension()-2-i]-1)
-    	   {
-    		   for(long k=0;k<d;k++)
-    			   diag[j][k]=temp[j][(k+ext_frob[i])%d];
-    	   }
-     
-       }
-      	temp[j]=diag[j];
-
-       if(ea.coordinate(dims[ea.dimension()-1],j)<=offset-1)
-       {
-    	   for(long k=0;k<d;k++)
-    	   diag[j][k]=temp[j][(k+8)%d];
-       }
-    }
-       
-    
     for (long i: range(d)) {
       for (long j: range(nslots)) slots[j] = diag[j][i];
       ea.encode(poly[i], slots);
@@ -2252,7 +2137,7 @@ struct BlockMatMulFullExec_construct {
     if (dim >= ea.dimension()-1) {
       // Last dimension (recursion edge condition)
 
-      BlockMatMulFullHelper<type> helper(ea_basetype, mat, idxes, dims[dim],idx,dims);
+      BlockMatMulFullHelper<type> helper(ea_basetype, mat, idxes, dims[dim]);
       transforms.emplace_back(helper, minimal);
       idx++;
       return idx;
@@ -2362,8 +2247,7 @@ BlockMatMulFullExec::rec_mul(Ctxt& acc, const Ctxt& ctxt, long dim_idx, long idx
 
     if (!iterative) {
 
-    
-      if (1) {
+      if (native) {
 	shared_ptr<GeneralAutomorphPrecon> precon =
 	  buildGeneralAutomorphPrecon(ctxt, dim, ea);
 
@@ -2407,7 +2291,7 @@ BlockMatMulFullExec::rec_mul(Ctxt& acc, const Ctxt& ctxt, long dim_idx, long idx
     }
     else {
 
-      if (1) {
+      if (native) {
 	Ctxt sh_ctxt = ctxt;
 	for (long offset: range(sdim)) {
 	  if (offset > 0) sh_ctxt.smartAutomorph(zMStar.genToPow(dim, 1));
