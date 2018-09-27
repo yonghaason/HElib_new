@@ -385,19 +385,15 @@ void addMinimalFrbMatrices(FHESecKey& sKey, long keyID)
 static void addNewBSGSmats4dim(FHESecKey& sKey, long i, long keyID)
 {
   const PAlgebra& zMStar = sKey.getContext().zMStar;
-  long m;
-  long ord;
-  long ordP;
-
-  m = zMStar.getM();
-  ord = zMStar.OrderOf(i);
-  ordP = zMStar.getOrdP();
+  long m = zMStar.getM();
+  long ord = zMStar.OrderOf(i);
+  long ordP = zMStar.getOrdP();
 
   long g = NewKSGiantStepSize(ord, ordP);
 
   // baby steps
   for (long j = 1; j < g; j++) {
-    for (long k = 1; k < ordP; k++) {
+    for (long k = 0; k < ordP; k++) {
       sKey.GenKeySWmatrix(1, MulMod(zMStar.genToPow(i, j), zMStar.genToPow(-1, k), m), keyID, keyID);
     }
   }
@@ -413,12 +409,70 @@ void addNewBSGSMatrices(FHESecKey& sKey, long bound, long keyID)
 {
   const FHEcontext &context = sKey.getContext();
   for (long i: range(context.zMStar.numOfGens())) {
-    if (bound >= context.zMStar.OrderOf(i))
+    if (bound >= context.zMStar.OrderOf(i)) {
+      // cout << "dim" << i << ": BSGS Key" << endl;
       addSome1Dmats4dim(sKey, i, bound, keyID);
+    }
     else
       addNewBSGSmats4dim(sKey, i, keyID);
   }
   sKey.setKeySwitchMap();
+}
+
+static void recaddMatrices(FHESecKey& sKey, long dim, long enddim, long idx, long endidx, long keyID) {
+	
+	const PAlgebra& zMStar = sKey.getContext().zMStar;
+	long m = zMStar.getM();
+
+	if (dim != enddim) { 
+		for (long j = 1; j < zMStar.OrderOf(dim); j++) {
+			MulMod(idx, zMStar.genToPow(dim, j), m);
+		}
+		recaddMatrices(sKey, dim-1, enddim, idx, endidx, keyID);
+	}
+	else {
+		for (long j = endidx; j < zMStar.OrderOf(dim); j += endidx) {
+			MulMod(idx, zMStar.genToPow(dim, j), m);
+			sKey.GenKeySWmatrix(1, idx, keyID, keyID);
+		}
+	}
+}
+
+void addNewFullBSGSMatrices(FHESecKey& sKey, long keyID)
+{
+	const PAlgebra& zMStar = sKey.getContext().zMStar;
+	long m = zMStar.getM();
+	long ordP = zMStar.getOrdP();
+	long ndims = zMStar.numOfGens();
+	vector<long> ord;
+	resize(ord, ndims);
+	for (long i = 0; i < lsize(ord); i++){
+		ord[i] = zMStar.OrderOf(i);
+	}
+
+	// baby steps
+	long nslots = zMStar.getNSlots();
+	long fork = SqrRoot(nslots);
+	long g = (ord[0] > fork) ? fork : ord[0];
+	for (long i = 1; i < g; i++) {
+		sKey.GenKeySWmatrix(1, zMStar.genToPow(0, i), keyID, keyID);
+	}
+
+	// giant steps
+	long enddim = 0;
+	long endidx = ord[0] / g;
+	if (g == ord[0]) {
+		enddim = 1;
+		endidx = 1;
+	}
+
+	for (long i = 0; i < ordP; i++) {
+		long idx = zMStar.genToPow(-1, i);
+		// recursive call
+		recaddMatrices(sKey, ndims-1, enddim, idx, endidx, keyID);
+	}
+
+	sKey.setKeySwitchMap();
 }
 
 // Generate all key-switching matrices for a given permutation network

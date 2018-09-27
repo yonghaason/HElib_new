@@ -9,6 +9,10 @@ Our bsgs를 옵션(force_block_bsgs)으로 선택할 수 있게 했음
 
 e.g) 바뀐 파일들: EncryptedArray, PAlgebra, matmul.
 
+- 09/26: Block_bsgs 새로 짠거 왜이렇게 느린지?
+
+- Key를 제대로 안가지고 있어도 돌아가는듯.... 정확히 무슨 Key를 주는게 최선인지 확인하기 어렵ㅠ
+
 ## TODO
 
 ### Writing

@@ -120,6 +120,9 @@ void TestIt(FHEcontext& context, long dim, bool verbose, long full, long block)
     addSomeFrbMatrices(secretKey);
     addNewBSGSMatrices(secretKey);
     break;
+  case 5:
+    addNewFullBSGSMatrices(secretKey);
+    break;
 
    default:
      Error("bad ks_strategy");
@@ -204,7 +207,7 @@ int main(int argc, char *argv[])
   amap.arg("force_hoist", fhe_test_force_hoist, 
            "-1 to force off"); 
   amap.arg("ks_strategy", ks_strategy,
-           "0: default, 1:full, 2:bsgs, 3:minimal, 4:working"); 
+           "0: default, 1:full, 2:bsgs, 3:minimal, 4:New1D, 5:NewFull"); 
 
   long full = 0; 
   amap.arg("full", full, "0: 1D, 1: full");

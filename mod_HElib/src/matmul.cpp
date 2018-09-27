@@ -1410,6 +1410,7 @@ BlockMatMul1DExec::BlockMatMul1DExec(
 
     bool bsgs = comp_block_bsgs(D > FHE_BSGS_MUL_THRESH || 
                           (minimal && D > FHE_KEYSWITCH_MIN_THRESH) );
+    
     if (!bsgs)
        g = 0; // do not use BSGS
     else
@@ -1479,12 +1480,11 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
        AvailableThreads() == 1)
       iterative1 = true;
 
-  long h = divc(D, g);
   vector<Ctxt> acc(d1, Ctxt(ZeroCtxtLike, ctxt));
-  vector<Ctxt> acc2(d*h, Ctxt(ZeroCtxtLike, ctxt));
-
-  if (iterative0) {
-    if (g) { // BSGS
+  if (g) {
+	long h = divc(D, g);
+	vector<Ctxt> acc_(d*h, Ctxt(ZeroCtxtLike, ctxt));
+	if (iterative0) {
       Ctxt sh_ctxt(ctxt);
       vector<Ctxt> baby_steps(g, Ctxt(ZeroCtxtLike, ctxt)); //// baby_steps[s] = rot(or sigma)^s(v) for j in [0..g).
       baby_steps[0] = ctxt;
@@ -1494,7 +1494,6 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
         baby_steps[s].cleanUp();
       }
 
-      long h = divc(d0, g);
       for (long j: range(d1)) {
         for (long k = h-1; k >= 0; k--) {
           if (k < h-1) {
@@ -1510,6 +1509,89 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
       }
     }
     else {
+	    // vector<shared_ptr<Ctxt>> baby_steps(g);
+	    // GenBabySteps(baby_steps, ctxt, dim, true);
+
+	    // for (long l=0; l<d;l++) {
+	    // 	PartitionInfo pinfo(h);
+	   	//     long cnt = pinfo.NumIntervals();
+	   	//     vector<Ctxt> acc2(cnt, Ctxt(ZeroCtxtLike, ctxt));
+
+	   	//     // parallel for loop: k in [0..h)
+	   	//     NTL_EXEC_INDEX(cnt, index)
+	   	//        long first, last;
+	   	//        pinfo.interval(first, last, index);
+
+	   	//        for (long k: range(first, last)) {
+	   	// 	  Ctxt acc_inner(ZeroCtxtLike, ctxt);
+
+	   	// 	  for (long j: range(g)) {
+	   	// 	     long i = j + g*k;
+	   	// 	     if (i >= D) break;
+	   	// 	     MulAdd(acc_inner, cache.multiplier[i*d1+l], *baby_steps[j]); 
+	   	// 	  }
+
+	   	// 	  if (k > 0) acc_inner.smartAutomorph(zMStar.genToPow(dim, g*k));
+	   	// 	  acc2[index] += acc_inner;
+	   	//        }
+	   	//     NTL_EXEC_INDEX_END
+
+	   	//     acc[l] = acc2[0];
+	   	//     for (long i: range(1, cnt)) acc[l] += acc2[i];   
+	    // }
+	    
+ 	    vector<shared_ptr<Ctxt>> baby_steps(g);
+ 	    GenBabySteps(baby_steps, ctxt, dim, true);
+ 	    for(long j: range(d)) {
+ 	    	for(long k: range(h))	{
+ 	    		for(long l: range(g)) {
+ 	    			long i = g*k + l;
+ 	    			if (i >= D) break;
+ 	    			MulAdd(acc_[j+d*k], cache.multiplier[i*d+j], *baby_steps[l]);
+ 	    		}
+ 	    	}
+ 	    }
+  	}
+  	if (iterative1) {
+    	Ctxt sum(acc[d1-1]);
+      	for (long j = d1-2; j >= 0; j--) {
+	        sum.smartAutomorph(zMStar.genToPow(dim1, 1));
+	        sum.cleanUp();
+	        sum += acc[j];
+	    }
+   		ctxt = sum;
+  	}
+  	else {
+	   //  PartitionInfo pinfo(d1);
+	   //  long cnt = pinfo.NumIntervals();
+	   //  vector<Ctxt> sum(cnt, Ctxt(ZeroCtxtLike, ctxt));
+
+	   //  // for j in [0..d1)
+	   //  NTL_EXEC_INDEX(cnt, index)
+	   //  long first, last;
+	   //  pinfo.interval(first, last, index);
+	   //  for (long j: range(first, last)) {
+		  //   if (j > 0) acc[j].smartAutomorph(zMStar.genToPow(dim1, j));
+	   //    sum[index] += acc[j];
+	   //  }
+	   //  NTL_EXEC_INDEX_END
+		  // ctxt = sum[0];
+	   //  for (long i: range(1, cnt)) ctxt += sum[i];
+
+  		 Ctxt sum(ZeroCtxtLike, ctxt);	  
+		 for(long j: range(d))
+		  {
+			  for(long k: range(h))
+			  {
+				  acc_[j+d*k].smartAutomorph(zMStar.genToPow(dim1, j)*zMStar.genToPow(dim0, g*k));
+				  sum += acc_[j+d*k];
+			  }
+		  }
+		  ctxt = sum;
+    }
+  }
+  else { // NO BSGS
+  	if (iterative0) {
       Ctxt sh_ctxt(ctxt);
       for (long i: range(d0)) {
         if (i > 0) {
@@ -1521,99 +1603,45 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
         }
       }
     }
-  }
- else { // hoisting
-  	 if (g) {
-  	 	 /* 
-  	    long h = divc(D, g);
-	    vector<shared_ptr<Ctxt>> baby_steps(g);
-	    GenBabySteps(baby_steps, ctxt, dim, true);
+ 	else { // hoisting
+	 shared_ptr<GeneralAutomorphPrecon> precon = buildGeneralAutomorphPrecon(ctxt, dim0, ea);
+	 long par_buf_sz = 1;
 
-	    for(int l=0; l<d;l++) {
-	    	PartitionInfo pinfo(h);
-	   	    long cnt = pinfo.NumIntervals();
-	   	    vector<Ctxt> acc2(cnt, Ctxt(ZeroCtxtLike, ctxt));
+     if (AvailableThreads() > 1) par_buf_sz = min(d0, par_buf_max);
 
-	   	    // parallel for loop: k in [0..h)
-	   	    NTL_EXEC_INDEX(cnt, index)
-	   	       long first, last;
-	   	       pinfo.interval(first, last, index);
+     vector<shared_ptr<Ctxt>> par_buf(par_buf_sz);
+    
+     for (long first_i = 0; first_i < d0; first_i += par_buf_sz) {
+	     long last_i = min(first_i + par_buf_sz, d0);
+	      // for i in [first_i..last_i), generate automorphosm i and store
+	      // in par_buf[i-first_i]
+	     NTL_EXEC_RANGE(last_i-first_i, first, last) 
+	     for (long idx: range(first, last)) {
+	        long i = idx + first_i;
+	        par_buf[idx] = precon->automorph(i);
+	     }
+	     NTL_EXEC_RANGE_END
 
-	   	       for (long k: range(first, last)) {
-	   		  Ctxt acc_inner(ZeroCtxtLike, ctxt);
-
-	   		  for (long j: range(g)) {
-	   		     long i = j + g*k;
-	   		     if (i >= D) break;
-	   		     MulAdd(acc_inner, cache.multiplier[i*d1+l], *baby_steps[j]); 
-	   		  }
-
-	   		  if (k > 0) acc_inner.smartAutomorph(zMStar.genToPow(dim, g*k));
-	   		  acc2[index] += acc_inner;
-	   	       }
-	   	    NTL_EXEC_INDEX_END
-
-	   	    acc[l] = acc2[0];
-	   	    for (long i: range(1, cnt)) acc[l] += acc2[i];   
-	    }
-       */
- 	    vector<shared_ptr<Ctxt>> baby_steps(g);
- 	    GenBabySteps(baby_steps, ctxt, dim, true);
- 	    for(long j: range(d))
- 	    {
- 	    	for(long k: range(h))	
- 	    	{
- 	    		for(long l: range(g))
- 	    		{
- 	    			long i = g*k + l;
- 	    			if(i >= D) break;
- 	    			MulAdd(acc2[j+d*k], cache.multiplier[i*d+j], *baby_steps[l]);
- 	    		}
- 	    	}
- 	    }  		
-  	 }
-     else {
-	     shared_ptr<GeneralAutomorphPrecon> precon = buildGeneralAutomorphPrecon(ctxt, dim0, ea);
-    	 long par_buf_sz = 1;
-
-	     if (AvailableThreads() > 1) par_buf_sz = min(d0, par_buf_max);
-
-	     vector<shared_ptr<Ctxt>> par_buf(par_buf_sz);
-	    
-	     for (long first_i = 0; first_i < d0; first_i += par_buf_sz) {
-		     long last_i = min(first_i + par_buf_sz, d0);
-		      // for i in [first_i..last_i), generate automorphosm i and store
-		      // in par_buf[i-first_i]
-		     NTL_EXEC_RANGE(last_i-first_i, first, last) 
-		     for (long idx: range(first, last)) {
-		        long i = idx + first_i;
-		        par_buf[idx] = precon->automorph(i);
-		     }
-		     NTL_EXEC_RANGE_END
-
-		     NTL_EXEC_RANGE(d1, first, last)
-		     for (long j: range(first, last)) {
-		         for (long i: range(first_i, last_i)) {
-		         	 MulAdd(acc[j], cache.multiplier[i*d1+j], *par_buf[i-first_i]);
-	        	 }
-	      	 }
-		     
-		     NTL_EXEC_RANGE_END
-    	 } 
-  	 }
+	     NTL_EXEC_RANGE(d1, first, last)
+	     for (long j: range(first, last)) {
+	         for (long i: range(first_i, last_i)) {
+	         	 MulAdd(acc[j], cache.multiplier[i*d1+j], *par_buf[i-first_i]);
+        	 }
+      	 }
+	     
+	     NTL_EXEC_RANGE_END
+	 } 
 	}
-
-  if (iterative1) {
-    Ctxt sum(acc[d1-1]);
-      for (long j = d1-2; j >= 0; j--) {
-        sum.smartAutomorph(zMStar.genToPow(dim1, 1));
-        sum.cleanUp();
-        sum += acc[j];
-      }
-    ctxt = sum;
-  }
+	  if (iterative1) {
+	    Ctxt sum(acc[d1-1]);
+	      for (long j = d1-2; j >= 0; j--) {
+	        sum.smartAutomorph(zMStar.genToPow(dim1, 1));
+	        sum.cleanUp();
+	        sum += acc[j];
+	      }
+	    ctxt = sum;
+	  }
   else {
-	/*
     PartitionInfo pinfo(d1);
     long cnt = pinfo.NumIntervals();
     vector<Ctxt> sum(cnt, Ctxt(ZeroCtxtLike, ctxt));
@@ -1629,21 +1657,10 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
     NTL_EXEC_INDEX_END
 	  ctxt = sum[0];
     for (long i: range(1, cnt)) ctxt += sum[i];
-    */
-	 Ctxt sum(ZeroCtxtLike, ctxt);	  
-	 for(long j: range(d))
-	  {
-		  for(long k: range(h))
-		  {
-			  acc2[j+d*k].smartAutomorph(zMStar.genToPow(dim1, j)*zMStar.genToPow(dim0, g*k));
-			  sum += acc2[j+d*k];
-		  }
-	  }
-	  ctxt = sum;
-	  
-  }
+
+  	}
+  }   
 }
-   
 
 // ===================== MatMulFull stuff ==================
 
@@ -2060,6 +2077,8 @@ public:
 
   const EncryptedArray& getEA() const override { return ea_basetype; }
   long getDim() const override { return dim; }
+
+
 };
 
 
@@ -2149,6 +2168,8 @@ struct BlockMatMulFullExec_construct {
 
     rec_mul(0, 0, idxes, transforms, minimal, dims, ea_basetype, ea, mat);
   }
+
+
 };
 
 
