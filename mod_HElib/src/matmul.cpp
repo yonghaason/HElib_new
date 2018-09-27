@@ -2078,22 +2078,26 @@ struct BlockMatMulFullExec_construct {
   {
     if (dim == 0) {
       // Last dimension (recursion edge condition)
-
     			long D = dimSz(ea, dim);
- 	           long d = ea.getDegree();
-    	 	 	 cache[idx].multiplier.resize(D*d);
-    	 	 	 for (long iii: range(D)) {
-    	        bool zero;
-    	        vector<RX> poly;
-    	         vector<long> rot_idx;
-    	          long ndims = ea.dimension();
-    	          long product = 1;
-    	          for (long ii: range(ndims-1)) {
-    	            rot_idx.push_back(idx%dimSz(ea, ii+1));
-    	            product *= ea.getPAlgebra().genToPow(ii+1,idx%dimSz(ea, ii+1));
-    	            idx /= dimSz(ea, ii+1);
-    	          }
-    
+    			long d = ea.getDegree();
+    			long m = ea.getPAlgebra().getM();
+    			cache.resize(m/D/d);
+    			cache[idx].multiplier.resize(D*d);
+
+    			for (long iii: range(D)) {
+    				bool zero;
+    				vector<RX> poly;
+    				vector<long> rot_idx;
+    				long ndims = ea.dimension();
+    				long product = 1;
+
+    				for (long ii: range(ndims-1)) {
+    					rot_idx.push_back(idx%dimSz(ea, ii+1));
+    					product *= ea.getPAlgebra().genToPow(ii+1,idx%dimSz(ea, ii+1));
+    					product %= m;
+    					idx /= dimSz(ea, ii+1);
+    				}
+
     	           vector<long> idxes2;
     	           ea.EncryptedArrayBase::rotate1D(idxes2, idxes, dim, iii);
 
@@ -2165,17 +2169,20 @@ struct BlockMatMulFullExec_construct {
     	           }
 
     	           zero = false; // a nonzero diagonal
- 	        
+
     	        if (zero) {
     	          for (long j: range(d)) cache[idx].multiplier[iii*d+j] = nullptr;
     	        }
+
     	        else {
     	          for (long j: range(d)) 
     	          {
-    	        	  plaintextAutomorph(poly[j], poly[j], -product, ea.getPAlgebra().getM(), ea.getTab().getPhimXMod());
+
+    	        	  plaintextAutomorph(poly[j], poly[j], m-product, ea.getPAlgebra().getM(), ea.getTab().getPhimXMod());
     	        	  cache[idx].multiplier[iii*d+j] = build_ConstMultiplier(poly[j], -1, -j, ea); 
     	          }
     	        }
+
     	      }
     	      
       idx++;
@@ -2217,7 +2224,7 @@ struct BlockMatMulFullExec_construct {
     vector<long> idxes(nslots);
     for (long i: range(nslots)) idxes[i] = i;
 
-    rec_mul(0, ea.dimension()-1, idxes, cache, minimal, ea_basetype, ea, mat);
+    rec_mul(ea.dimension()-1, 0, idxes, cache, minimal, ea_basetype, ea, mat);
   }
 };
 
@@ -2272,6 +2279,7 @@ BlockMatMulFullExec::mul(Ctxt& ctxt) const
  	    	       for (long ii: range(ndims-1)) {
  	    	       rot_idx.push_back(idx%dimSz(ea, ii+1));
  	    	       product *= ea.getPAlgebra().genToPow(ii+1,idx%dimSz(ea, ii+1));
+ 	    	       product %= m;
  	    	       idx /= dimSz(ea, ii+1);
  	    	       }
  	    	       product *= ea.getPAlgebra().genToPow(-1, j)*ea.getPAlgebra().genToPow(0, g*k);

@@ -350,6 +350,10 @@ public:
 
   // Upgrades encoded constants from zzX to DoubleCRT.
   void upgrade() override { 
+	long D = ea.sizeOfDimension(0);
+	long d = ea.getDegree();
+	long m = ea.getPAlgebra().getM();  
+	for(long i: range(m/D/d)) cache[i].upgrade(ea.getContext());
   }
 
   const EncryptedArray& getEA() const override { return ea; }
