@@ -47,12 +47,10 @@ template<class Matrix>
 bool DoTest(const Matrix& mat, const EncryptedArray& ea, 
             const FHESecKey& secretKey, bool minimal, bool verbose)
 {
-	  FHE_NTIMER_START(Build);
-	  typename Matrix::ExecType mat_exec(mat, minimal);
-	  FHE_NTIMER_STOP(Build);
-	  FHE_NTIMER_START(Conv);
-	  mat_exec.upgrade();
-	  FHE_NTIMER_STOP(Conv);
+  FHE_NTIMER_START(EncodeMartix_MatMul);
+  typename Matrix::ExecType mat_exec(mat, minimal);
+  mat_exec.upgrade();
+  FHE_NTIMER_STOP(EncodeMartix_MatMul);
 
   // choose a random plaintext vector and encrypt it
   NewPlaintextArray v(ea);
@@ -63,9 +61,7 @@ bool DoTest(const Matrix& mat, const EncryptedArray& ea,
   ea.encrypt(ctxt, secretKey, v);
   Ctxt ctxt2 = ctxt;
 
- FHE_NTIMER_START(Linear_Trans);
   mat_exec.mul(ctxt);
-  FHE_NTIMER_STOP(Linear_Trans);
 
   mul(v, mat);     // multiply the plaintext vector
 
@@ -136,7 +132,7 @@ void TestIt(FHEcontext& context, long dim, bool verbose, long full, long block)
   }
 
   bool okSoFar = true;
-  for (long i=0; i<3; i++) {
+  for (long i=0; i<5; i++) {
     if (full == 0 && block == 0) {
       std::unique_ptr< MatMul1D > ptr(buildRandomMatrix(ea,dim));
       if (!DoTest(*ptr, ea, secretKey, minimal, verbose))
