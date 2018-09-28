@@ -60,6 +60,7 @@ public:
   // Each entry is a d x d matrix over the base ring.
   // Should return true when the entry is a zero. 
   virtual bool get(mat_R& out, long i, long j) const = 0;
+  
 };
 
 //====================================
@@ -328,9 +329,9 @@ public:
 
   const EncryptedArray& ea;
   bool minimal;
-  std::vector<long> dims;
-  std::vector<BlockMatMul1DExec> transforms;
-
+  long g;
+  std::vector<ConstMultiplierCache> cache;
+  
   // The constructor encodes all the constants for a given
   // matrix in zzX format.
   // The mat argument defines the entries of the matrix.
@@ -349,13 +350,15 @@ public:
 
   // Upgrades encoded constants from zzX to DoubleCRT.
   void upgrade() override { 
-    for (auto& t: transforms) t.upgrade();
+	long D = ea.sizeOfDimension(0);
+	long d = ea.getDegree();
+	long m = ea.getPAlgebra().getM();  
+	for(long i: range(m/D/d)) cache[i].upgrade(ea.getContext());
   }
 
   const EncryptedArray& getEA() const override { return ea; }
 
-  // This really should be private.
-  long rec_mul(Ctxt& acc, const Ctxt& ctxt, long dim, long idx) const;
+
 
 };
 
