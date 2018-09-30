@@ -352,8 +352,8 @@ public:
   void upgrade() override { 
 	long D = ea.sizeOfDimension(0);
 	long d = ea.getDegree();
-	long m = ea.getPAlgebra().getM();  
-	for(long i: range(m/D/d)) cache[i].upgrade(ea.getContext());
+	long phim = ea.getPAlgebra().getPhiM();  
+	for(long i: range(phim/D/d)) cache[i].upgrade(ea.getContext());
   }
 
   const EncryptedArray& getEA() const override { return ea; }
