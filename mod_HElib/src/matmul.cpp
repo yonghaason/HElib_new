@@ -2018,16 +2018,17 @@ struct BlockMatMulFullExec_construct {
     				bool zero;
     				vector<RX> poly;
     				vector<long> rot_idx;
+    				long temp_idx = idx;
     				long ndims = ea.dimension();
     				long product = 1;
     				long g = SqrRoot(phim);
     				long k = iii/g;
     						
     				for (long ii: range(ndims-1)) {
-    					rot_idx.push_back(idx%dimSz(ea, ii+1));
-    					product *= ea.getPAlgebra().genToPow(ii+1,-(idx%dimSz(ea, ii+1)));
+    					rot_idx.push_back(temp_idx%dimSz(ea, ii+1));
+    					product *= ea.getPAlgebra().genToPow(ii+1,-(temp_idx%dimSz(ea, ii+1)));
     					product %= m;
-    					idx /= dimSz(ea, ii+1);
+    					temp_idx /= dimSz(ea, ii+1);
     				}
     				
     				product *= ea.getPAlgebra().genToPow(0,-g*k);
@@ -2196,30 +2197,27 @@ BlockMatMulFullExec::mul(Ctxt& ctxt) const
   long m = ea.getPAlgebra().getM();
 
   vector<shared_ptr<Ctxt>> baby_steps(g);
-  GenBabySteps(baby_steps, ctxt, 0, false);
+  GenBabySteps(baby_steps, ctxt, 0, true);
   vector<Ctxt> acc(phim*h/D1, Ctxt(ZeroCtxtLike, ctxt));
   Ctxt sum(ZeroCtxtLike, ctxt);	  
   long ndims = ea.dimension();
 	
   
-
-  
-  
-  
  	    for(long idx: range(phim/(D1*d)))
  	    {
+ 	    
  	    	for(long j: range(d))
  	    	{
  	    		for(long k: range(h))
- 	    		{
-
- 	    	       long product = 1;
- 	    	       for (long ii: range(ndims-1)) {
- 	    	       product *= ea.getPAlgebra().genToPow(ii+1,idx%dimSz(ea, ii+1));
- 	    	       product %= m;
- 	    	       idx /= dimSz(ea, ii+1);
- 	    	       }
- 	    	       product *= ea.getPAlgebra().genToPow(-1, j)*ea.getPAlgebra().genToPow(0, g*k);
+ 	    		{ 	
+ 	    		   long temp_idx = idx;
+ 	    		   long product = 1;
+ 	    		 	for (long ii: range(ndims-1)) {
+ 	    		 		product *= ea.getPAlgebra().genToPow(ii+1,temp_idx%dimSz(ea, ii+1));
+ 	    		 		product %= m;
+ 	    		 		temp_idx /= dimSz(ea, ii+1);
+ 	    		 	}
+ 	    		 	product *= ea.getPAlgebra().genToPow(-1, j)*ea.getPAlgebra().genToPow(0, g*k);
  	    	       product %= m;
  	    			
  	    			for(long l: range(g))
@@ -2228,7 +2226,6 @@ BlockMatMulFullExec::mul(Ctxt& ctxt) const
  	    				if(i >= D1) break;
  	    				MulAdd(acc[idx*d*h+j*h+k], cache[idx].multiplier[i*d+j], *baby_steps[l]);
  	    			}
- 	    			
  	    			acc[idx*d*h+j*h+k].smartAutomorph(product);
  	    			sum += acc[idx*d*h+j*h+k];
  	    			
