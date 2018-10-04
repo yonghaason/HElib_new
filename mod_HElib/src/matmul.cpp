@@ -1962,124 +1962,6 @@ MatMulFullExec::mul(Ctxt& ctxt) const
 // lightly massaged version of MatMulFull code...some unfortunate
 // code duplication here
 
-template<class type>
-class BlockMatMulFullHelper : public BlockMatMul1D_partial<type> {
-public:
-  PA_INJECT(type)
-
-  const EncryptedArray& ea_basetype;
-  const BlockMatMulFull_derived<type>& mat;
-  vector<long> init_idxes;
-  long dim;
-  long total_idx;
-  vector<long> dims;
-
-  BlockMatMulFullHelper(const EncryptedArray& _ea_basetype, 
-                   const BlockMatMulFull_derived<type>& _mat,
-                   const vector<long>& _init_idxes,
-                   long _dim, long _idx, vector<long> _dims)
-
-    : ea_basetype(_ea_basetype),
-      mat(_mat),
-      init_idxes(_init_idxes),
-      dim(_dim),
-      total_idx(_idx),
-      dims(_dims)
-
-    { }
-
-
-  bool
-  processDiagonal(vector<RX>& poly, long offset,
-                  const EncryptedArrayDerived<type>& ea) const override
-  {
-    long tidx=total_idx;
-   vector<long> rot_idx;
-   long ndims = ea.dimension();
-   for (long i: range(ndims-1)) {
-     rot_idx.push_back(tidx%dimSz(ea, ndims-2-i));
-     tidx=tidx/dimSz(ea, ndims-2-i);
-   }
-
-    vector<long> idxes;
-    ea.EncryptedArrayBase::rotate1D(idxes, init_idxes, dim, offset);
-
-    long d = ea.getDegree();
-    long nslots = ea.size();
-    bool zDiag = true; // is this a zero diagonal?
-    long nzLast = -1;  // index of last non-zero entry
-
-    mat_R entry(INIT_SIZE, d, d);
-    std::vector<RX> entry1(d);
-
-    vector<vector<RX>> diag(nslots);
-    vector<vector<RX>> temp(nslots);
-
-    for (long j: range(nslots)) {
-      long i = idxes[j];
-      bool zEntry = mat.get(entry, i, j);
-
-      // the remainder is copied and pasted from the processDiagonal2 logic
-      // for BlockMatMul1D....FIXME: code duplication
-
-      if (!zEntry && IsZero(entry)) zEntry=true; // zero is an empty entry too
-      assert(zEntry ||
-             (entry.NumRows() == d && entry.NumCols() == d));
-
-      if (!zEntry) {    // non-empty entry
-	zDiag = false;  // mark diagonal as non-empty
-
-	for (long jj: range(nzLast+1, j)) // clear from last nonzero entry
-          diag[jj].assign(d, RX());
-
-	nzLast = j; // current entry is the last nonzero one
-
-	// recode entry as a vector of polynomials
-	for (long k: range(d)) conv(entry1[k], entry[k]);
-
-        // compute the linearlized polynomial coefficients
-	ea.buildLinPolyCoeffs(diag[j], entry1);
-      }
-    }
-    if (zDiag) return true; // zero diagonal, nothing to do
-
-    // clear trailing zero entries
-    for (long jj: range(nzLast+1, nslots))
-      diag[jj].assign(d, RX());
-
-    // transpose and encode diag to form polys
-
-    vector<RX> slots(nslots);
-    poly.resize(d);
-
-    for (long j: range(nslots)) {
-       for (long i: range(ndims-1)) {
-        temp[j]=diag[j];
-         if (ea.coordinate(i,j) <= rot_idx[ndims-2-i] - 1) {
-           for (long k: range(d)) diag[j][k]=temp[j][(k+ea.Frobshift(ndims-1-i))%d];
-         }
-       }
-        temp[j]=diag[j];
-
-       if (ea.coordinate(ndims-1,j) <= offset-1)
-       {
-         for (long k: range(d)) diag[j][k]=temp[j][(k+ea.Frobshift(0))%d];
-       }
-    }  
-
-    for (long i: range(d)) {
-      for (long j: range(nslots)) slots[j] = diag[j][i];
-      ea.encode(poly[i], slots);
-    }
-
-    return false; // a nonzero diagonal
-  }
-
-  const EncryptedArray& getEA() const override { return ea_basetype; }
-  long getDim() const override { return dim; }
-
-
-};
 
 
 template<class type>
@@ -2097,113 +1979,116 @@ struct BlockMatMulFullExec_construct {
   {
     if (dim == 0) {
       // Last dimension (recursion edge condition)
-    			long D = dimSz(ea, dim);
-    			long d = ea.getDegree();
-    			long m = ea.getPAlgebra().getM();
-    			cache.resize(m/D/d);
-    			cache[idx].multiplier.resize(D*d);
+          long D = dimSz(ea, dim);
+          long d = ea.getDegree();
+          long m = ea.getPAlgebra().getM();
+          long phim = ea.getPAlgebra().getPhiM();
+          cache.resize(phim/D/d);
+          cache[idx].multiplier.resize(D*d);
 
-    			for (long iii: range(D)) {
-    				bool zero;
-    				vector<RX> poly;
-    				vector<long> rot_idx;
-    				long ndims = ea.dimension();
-    				long product = 1;
+          for (long iii: range(D)) {
+            bool zero;
+            vector<RX> poly;
+            vector<long> rot_idx;
+            long temp_idx = idx;
+            long ndims = ea.dimension();
+            long product = 1;
+            long g = SqrRoot(phim);
+            long k = iii/g;
+                
+            // Compute the exponent 'e' (= product) that represents all rotations corresponding to 'idx'
+            for (long ii: range(ndims-1)) {
+              rot_idx.push_back(temp_idx%dimSz(ea, ii+1));
+              product *= ea.getPAlgebra().genToPow(ii+1,-(temp_idx%dimSz(ea, ii+1)));
+              product %= m;
+              temp_idx /= dimSz(ea, ii+1);
+            }
+            
+            product *= ea.getPAlgebra().genToPow(0,-g*k);
+            product %= m;
 
-    				for (long ii: range(ndims-1)) {
-    					rot_idx.push_back(idx%dimSz(ea, ii+1));
-    					product *= ea.getPAlgebra().genToPow(ii+1,idx%dimSz(ea, ii+1));
-    					product %= m;
-    					idx /= dimSz(ea, ii+1);
-    				}
+           vector<long> idxes2;
+           ea.EncryptedArrayBase::rotate1D(idxes2, idxes, dim, iii);
 
-    	           vector<long> idxes2;
-    	           ea.EncryptedArrayBase::rotate1D(idxes2, idxes, dim, iii);
+           long nslots = ea.size();
+           bool zDiag = true; // is this a zero diagonal?
+           long nzLast = -1;  // index of last non-zero entry
 
-    	           long nslots = ea.size();
-    	           bool zDiag = true; // is this a zero diagonal?
-    	           long nzLast = -1;  // index of last non-zero entry
+           mat_R entry(INIT_SIZE, d, d);
+           std::vector<RX> entry1(d);
 
-    	           mat_R entry(INIT_SIZE, d, d);
-    	           std::vector<RX> entry1(d);
+           vector<vector<RX>> diag(nslots);
+           vector<vector<RX>> temp(nslots);
 
-    	           vector<vector<RX>> diag(nslots);
-    	           vector<vector<RX>> temp(nslots);
+           for (long j: range(nslots)) {
+             long i = idxes2[j];
+             bool zEntry = mat.get(entry, i, j);
 
-    	           for (long j: range(nslots)) {
-    	             long i = idxes2[j];
-    	             bool zEntry = mat.get(entry, i, j);
+             if (!zEntry && IsZero(entry)) zEntry=true; // zero is an empty entry too
+             assert(zEntry ||
+                    (entry.NumRows() == d && entry.NumCols() == d));
 
-    	             // the remainder is copied and pasted from the processDiagonal2 logic
-    	             // for BlockMatMul1D....FIXME: code duplication
+               if (!zEntry) {    // non-empty entry
+                zDiag = false;  // mark diagonal as non-empty
 
-    	             if (!zEntry && IsZero(entry)) zEntry=true; // zero is an empty entry too
-    	             assert(zEntry ||
-    	                    (entry.NumRows() == d && entry.NumCols() == d));
+                for (long jj: range(nzLast+1, j)) // clear from last nonzero entry
+                         diag[jj].assign(d, RX());
 
-    	             if (!zEntry) {    // non-empty entry
-    	       	zDiag = false;  // mark diagonal as non-empty
+                nzLast = j; // current entry is the last nonzero one
 
-    	       	for (long jj: range(nzLast+1, j)) // clear from last nonzero entry
-    	                 diag[jj].assign(d, RX());
+                // recode entry as a vector of polynomials
+                for (long k: range(d)) conv(entry1[k], entry[k]);
 
-    	       	nzLast = j; // current entry is the last nonzero one
+                       // compute the linearlized polynomial coefficients
+                ea.buildLinPolyCoeffs(diag[j], entry1);
+               }
+             }
+                 if (zDiag) zero = true; // zero diagonal, nothing to do
 
-    	       	// recode entry as a vector of polynomials
-    	       	for (long k: range(d)) conv(entry1[k], entry[k]);
+                 // clear trailing zero entries
+                 for (long jj: range(nzLast+1, nslots))
+                   diag[jj].assign(d, RX());
 
-    	               // compute the linearlized polynomial coefficients
-    	       	ea.buildLinPolyCoeffs(diag[j], entry1);
-    	             }
-    	           }
-    	           if (zDiag) zero = true; // zero diagonal, nothing to do
+                 // transpose and encode diag to form polys
 
-    	           // clear trailing zero entries
-    	           for (long jj: range(nzLast+1, nslots))
-    	             diag[jj].assign(d, RX());
+                 vector<RX> slots(nslots);
+                 poly.resize(d);
 
-    	           // transpose and encode diag to form polys
+                 for (long j: range(nslots)) {
+                    for (long i: range(ndims-1)) {
+                     temp[j]=diag[j];
+                      if (ea.coordinate(i+1,j) <= rot_idx[i] - 1) {
+                        for (long k: range(d)) diag[j][k]=temp[j][(k+ea.Frobshift(i+1))%d];
+                      }
+                    }
+                     temp[j]=diag[j];
 
-    	           vector<RX> slots(nslots);
-    	           poly.resize(d);
+                    if (ea.coordinate(0,j) <= iii-1)
+                    {
+                      for (long k: range(d)) diag[j][k]=temp[j][(k+ea.Frobshift(0))%d];
+                    }
+                 }  
 
-    	           for (long j: range(nslots)) {
-    	              for (long i: range(ndims-1)) {
-    	               temp[j]=diag[j];
-    	                if (ea.coordinate(i+1,j) <= rot_idx[i] - 1) {
-    	                  for (long k: range(d)) diag[j][k]=temp[j][(k+ea.Frobshift(i+1))%d];
-    	                }
-    	              }
-    	               temp[j]=diag[j];
+                 for (long i: range(d)) {
+                   for (long j: range(nslots)) slots[j] = diag[j][i];
+                   ea.encode(poly[i], slots);
+                 }
 
-    	              if (ea.coordinate(0,j) <= iii-1)
-    	              {
-    	                for (long k: range(d)) diag[j][k]=temp[j][(k+ea.Frobshift(0))%d];
-    	              }
-    	           }  
+                 zero = false; // a nonzero diagonal
 
-    	           for (long i: range(d)) {
-    	             for (long j: range(nslots)) slots[j] = diag[j][i];
-    	             ea.encode(poly[i], slots);
-    	           }
+              if (zero) {
+                for (long j: range(d)) cache[idx].multiplier[iii*d+j] = nullptr;
+              }
 
-    	           zero = false; // a nonzero diagonal
+              else {
+                for (long j: range(d)) {
+                  plaintextAutomorph(poly[j], poly[j], product, m, ea.getTab().getPhimXMod());
+                  cache[idx].multiplier[iii*d+j] = build_ConstMultiplier(poly[j], -1, -j, ea); 
+                }
+              }
 
-    	        if (zero) {
-    	          for (long j: range(d)) cache[idx].multiplier[iii*d+j] = nullptr;
-    	        }
-
-    	        else {
-    	          for (long j: range(d)) 
-    	          {
-
-    	        	  plaintextAutomorph(poly[j], poly[j], m-product, ea.getPAlgebra().getM(), ea.getTab().getPhimXMod());
-    	        	  cache[idx].multiplier[iii*d+j] = build_ConstMultiplier(poly[j], -1, -j, ea); 
-    	          }
-    	        }
-
-    	      }
-    	      
+            }
+            
       idx++;
       return idx;
     }
@@ -2245,8 +2130,6 @@ struct BlockMatMulFullExec_construct {
 
     rec_mul(ea.dimension()-1, 0, idxes, cache, minimal, ea_basetype, ea, mat);
   }
-
-
 };
 
 
@@ -2257,7 +2140,7 @@ BlockMatMulFullExec::BlockMatMulFullExec(
 {
   FHE_NTIMER_START(BlockMatMulFullExec);
   
-  g=SqrRoot(ea.getPAlgebra().getM());
+  g=SqrRoot(ea.getPAlgebra().getPhiM());
   if(g > ea.sizeOfDimension(0)) g = ea.sizeOfDimension(0);
   ea.dispatch<BlockMatMulFullExec_construct>(ea, mat, cache, minimal);
 }
@@ -2279,53 +2162,43 @@ BlockMatMulFullExec::mul(Ctxt& ctxt) const
   long D1 = dimSz(ea, 0);
   long d = ea.getDegree();
   long h = divc(D1, g);
+  long phim = ea.getPAlgebra().getPhiM();
   long m = ea.getPAlgebra().getM();
-  
+
   vector<shared_ptr<Ctxt>> baby_steps(g);
   GenBabySteps(baby_steps, ctxt, 0, true);
-  vector<Ctxt> acc(m*h/D1, Ctxt(ZeroCtxtLike, ctxt));
-  Ctxt sum(ZeroCtxtLike, ctxt);	  
+  vector<Ctxt> acc(phim*h/D1, Ctxt(ZeroCtxtLike, ctxt));
+  Ctxt sum(ZeroCtxtLike, ctxt);   
   long ndims = ea.dimension();
-	
- 	 
- 	    for(long idx: range(m/(D1*d)))
- 	    {
- 	    	for(long j: range(d))
- 	    	{
- 	    		for(long k: range(h))
- 	    		{
-
- 	    	       vector<long> rot_idx;
- 	    	       long product = 1;
- 	    	       for (long ii: range(ndims-1)) {
- 	    	       rot_idx.push_back(idx%dimSz(ea, ii+1));
- 	    	       product *= ea.getPAlgebra().genToPow(ii+1,idx%dimSz(ea, ii+1));
- 	    	       product %= m;
- 	    	       idx /= dimSz(ea, ii+1);
- 	    	       }
- 	    	       product *= ea.getPAlgebra().genToPow(-1, j)*ea.getPAlgebra().genToPow(0, g*k);
-     			
- 	    			
- 	    			for(long l: range(g))
- 	    			{
- 	    				long i = g*k + l;
- 	    				if(i >= D1) break;
- 	    				MulAdd(acc[idx*d*h+j*h+k], cache[idx].multiplier[i*d+j], *baby_steps[l]);
- 	    			}
- 	    			
- 	    			acc[idx*d*h+j*h+k].smartAutomorph(product);
- 	    			sum += acc[idx*d*h+j*h+k];
- 	    			
- 	    		}
- 	    	}
- 	    }
   
- 	    ctxt = sum;
+  for(long idx: range(phim/(D1*d))) { 
+    for(long j: range(d)) {
+      for(long k: range(h)) {   
+        long temp_idx = idx;
+        long product = 1;
+        for (long ii: range(ndims-1)) {
+          product *= ea.getPAlgebra().genToPow(ii+1,temp_idx%dimSz(ea, ii+1));
+          product %= m;
+          temp_idx /= dimSz(ea, ii+1);
+        }
+        product *= ea.getPAlgebra().genToPow(-1, j)*ea.getPAlgebra().genToPow(0, g*k);
+        product %= m;
+        for(long l: range(g)) {
+          long i = g*k + l;
+          if(i >= D1) break;
+          MulAdd(acc[idx*d*h + j*h + k], cache[idx].multiplier[i*d+j], *baby_steps[l]);
+        }
+        acc[idx*d*h + j*h + k].smartAutomorph(product);
+        sum += acc[idx*d*h + j*h + k];
+        
+      }
+    }
+  }
+
+  ctxt = sum;
   
 
 }
-
-
 
 
 // ================= plaintext mul stuff stuff ===============

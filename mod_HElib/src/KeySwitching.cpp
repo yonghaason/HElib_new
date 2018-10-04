@@ -280,12 +280,13 @@ static void addSome1Dmats4dim(FHESecKey& sKey, long i, long bound, long keyID)
   long g = KSGiantStepSize(ord);
 
   // baby steps
-  for (long j = 1; j < g; j++)
+  for (long j = 1; j < g; j++) 
     sKey.GenKeySWmatrix(1, zMStar.genToPow(i, j), keyID, keyID);
 
   // giant steps
   for (long j = g; j < ord; j += g)
     sKey.GenKeySWmatrix(1, zMStar.genToPow(i, j), keyID, keyID);
+  
 
   if (!native)
     sKey.GenKeySWmatrix(1, zMStar.genToPow(i, -ord), keyID, keyID);
@@ -348,7 +349,6 @@ static void addMinimal1Dmats4dim(FHESecKey& sKey, long i, long keyID)
     ord = zMStar.getOrdP();
     native = true;
   }
-
   sKey.GenKeySWmatrix(1, zMStar.genToPow(i, 1), keyID, keyID);
 
   if (!native)
@@ -393,13 +393,13 @@ static void addNewBSGSmats4dim(FHESecKey& sKey, long i, long keyID)
 
   // baby steps
   for (long j = 1; j < g; j++) {
-    for (long k = 0; k < ordP; k++) {
+    for (long k = 0; k < ordP; k++)
       sKey.GenKeySWmatrix(1, MulMod(zMStar.genToPow(i, j), zMStar.genToPow(-1, k), m), keyID, keyID);
-    }
   }
   // giant steps
-  for (long j = g; j < ord; j += g)
+  for (long j = g; j < ord; j += g){
     sKey.GenKeySWmatrix(1, zMStar.genToPow(i, j), keyID, keyID);
+  }
 
   sKey.setKSStrategy(i, FHE_KSS_NEW);
 }
@@ -425,15 +425,19 @@ static void recaddMatrices(FHESecKey& sKey, long dim, long enddim, long idx, lon
 	long m = zMStar.getM();
 
 	if (dim != enddim) { 
-		for (long j = 1; j < zMStar.OrderOf(dim); j++) {
-			MulMod(idx, zMStar.genToPow(dim, j), m);
+		for (long j = 0; j < zMStar.OrderOf(dim); j++) {
+			idx *= zMStar.genToPow(dim, j);
+      idx %= m;
+      recaddMatrices(sKey, dim-1, enddim, idx, endidx, keyID);
 		}
-		recaddMatrices(sKey, dim-1, enddim, idx, endidx, keyID);
 	}
 	else {
-		for (long j = endidx; j < zMStar.OrderOf(dim); j += endidx) {
-			MulMod(idx, zMStar.genToPow(dim, j), m);
-			sKey.GenKeySWmatrix(1, idx, keyID, keyID);
+		for (long j = 0; j < zMStar.OrderOf(dim); j += endidx) {
+			long tmp_idx = idx;
+      tmp_idx *= zMStar.genToPow(dim, j);
+      tmp_idx %= m;
+      if (idx != 1)
+        sKey.GenKeySWmatrix(1, tmp_idx, keyID, keyID);
 		}
 	}
 }
@@ -441,7 +445,6 @@ static void recaddMatrices(FHESecKey& sKey, long dim, long enddim, long idx, lon
 void addNewFullBSGSMatrices(FHESecKey& sKey, long keyID)
 {
 	const PAlgebra& zMStar = sKey.getContext().zMStar;
-	long m = zMStar.getM();
 	long ordP = zMStar.getOrdP();
 	long ndims = zMStar.numOfGens();
 	vector<long> ord;
@@ -451,16 +454,14 @@ void addNewFullBSGSMatrices(FHESecKey& sKey, long keyID)
 	}
 
 	// baby steps
-	long nslots = zMStar.getNSlots();
-	long fork = SqrRoot(nslots);
+	long fork = SqrRoot(zMStar.getPhiM());
 	long g = (ord[0] > fork) ? fork : ord[0];
-	for (long i = 1; i < g; i++) {
-		sKey.GenKeySWmatrix(1, zMStar.genToPow(0, i), keyID, keyID);
-	}
+	for (long i = 1; i < g; i++)
+    sKey.GenKeySWmatrix(1, zMStar.genToPow(0, i), keyID, keyID);
 
 	// giant steps
 	long enddim = 0;
-	long endidx = ord[0] / g;
+	long endidx = g;
 	if (g == ord[0]) {
 		enddim = 1;
 		endidx = 1;
@@ -468,7 +469,7 @@ void addNewFullBSGSMatrices(FHESecKey& sKey, long keyID)
 
 	for (long i = 0; i < ordP; i++) {
 		long idx = zMStar.genToPow(-1, i);
-		// recursive call
+    // recursive call
 		recaddMatrices(sKey, ndims-1, enddim, idx, endidx, keyID);
 	}
 
