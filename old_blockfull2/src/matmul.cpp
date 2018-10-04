@@ -2349,37 +2349,7 @@ BlockMatMulFullExec::rec_mul(Ctxt& acc, const Ctxt& ctxt, long dim_idx, long idx
 	  idx = rec_mul(acc, *tmp, dim_idx+1, idx);
 	}
       }
-      else {
-	Ctxt ctxt1 = ctxt;
-	ctxt1.smartAutomorph(zMStar.genToPow(dim, -sdim));
-	shared_ptr<GeneralAutomorphPrecon> precon =
-	  buildGeneralAutomorphPrecon(ctxt, dim, ea);
-	shared_ptr<GeneralAutomorphPrecon> precon1 =
-	  buildGeneralAutomorphPrecon(ctxt1, dim, ea);
-
-	for (long i: range(sdim)) {
-	  if (i == 0) 
-	     idx = rec_mul(acc, ctxt, dim_idx+1, idx);
-	  else {
-	    shared_ptr<Ctxt> tmp = precon->automorph(i);
-	    shared_ptr<Ctxt> tmp1 = precon1->automorph(i);
-
-	    zzX mask = ea.getAlMod().getMask_zzX(dim, i);
-
-	    DoubleCRT m1(mask, ea.getContext(),
-		 tmp->getPrimeSet() | tmp1->getPrimeSet());
-
-	    // Compute tmp = tmp*m1 + tmp1 - tmp1*m1
-	    tmp->multByConstant(m1);
-	    *tmp += *tmp1;
-	    tmp1->multByConstant(m1);
-	    *tmp -= *tmp1;
-
-	    idx = rec_mul(acc, *tmp, dim_idx+1, idx);
-	  }
-	}
-	
-      }
+      
 
     }
     else {
