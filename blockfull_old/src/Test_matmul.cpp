@@ -100,7 +100,6 @@ void TestIt(FHEcontext& context, long dim, bool verbose, long full, long block)
 
   switch (ks_strategy) {
   case 0:
-	  addAllMatrices(secretKey);
     addSome1DMatrices(secretKey);
     addSomeFrbMatrices(secretKey);
     break;

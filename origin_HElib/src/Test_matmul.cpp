@@ -61,8 +61,9 @@ bool DoTest(const Matrix& mat, const EncryptedArray& ea,
   ea.encrypt(ctxt, secretKey, v);
   Ctxt ctxt2 = ctxt;
 
+  FHE_NTIMER_START(Linear_trans);
   mat_exec.mul(ctxt);
-
+  FHE_NTIMER_STOP(Linear_trans);
   mul(v, mat);     // multiply the plaintext vector
 
   NewPlaintextArray v1(ea);
@@ -132,7 +133,7 @@ void TestIt(FHEcontext& context, long dim, bool verbose, long full, long block)
   }
 
   bool okSoFar = true;
-  for (long i=0; i<5; i++) {
+  for (long i=0; i<3; i++) {
     if (full == 0 && block == 0) {
       std::unique_ptr< MatMul1D > ptr(buildRandomMatrix(ea,dim));
       if (!DoTest(*ptr, ea, secretKey, minimal, verbose))

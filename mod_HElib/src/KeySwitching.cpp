@@ -393,14 +393,14 @@ static void addNewBSGSmats4dim(FHESecKey& sKey, long i, long keyID)
 
   // baby steps
   for (long j = 1; j < g; j++) {
-    for (long k = 0; k < ordP; k++)
-      sKey.GenKeySWmatrix(1, MulMod(zMStar.genToPow(i, j), zMStar.genToPow(-1, k), m), keyID, keyID);
+      sKey.GenKeySWmatrix(1, zMStar.genToPow(i, j), keyID, keyID);
   }
   // giant steps
-  for (long j = g; j < ord; j += g){
-    sKey.GenKeySWmatrix(1, zMStar.genToPow(i, j), keyID, keyID);
+  for (long j = g; j < ord; j += g) {
+    for (long k = 0; k < ordP; k++) {
+      sKey.GenKeySWmatrix(1, MulMod(zMStar.genToPow(i, j), zMStar.genToPow(-1, k), m), keyID, keyID);
+    }
   }
-
   sKey.setKSStrategy(i, FHE_KSS_NEW);
 }
 

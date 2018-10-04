@@ -13,6 +13,17 @@ e.g) 바뀐 파일들: EncryptedArray, PAlgebra, matmul.
 
 - Key를 제대로 안가지고 있어도 돌아가는듯.... 정확히 무슨 Key를 주는게 최선인지 확인하기 어렵ㅠ
 
+- 10/05: 왜 Sec 3까지만 적용된게 시간이 1/2이 안되는걸까요..? 서버에서 돌려봐야되나
+
+- Block1D with bsgs는 ks_strategy=4를 넣으면 정확히 필요한 키만 들고 있게 됨 (그렇지만 nobsgs보다 더 느림)
+
+- BlockFull은 ks_strategy=5를 넣으면 돌아가긴 하는데 .... Allkey를 들고 있을때보다 아직 느림. 뭐가 문제인지는 더 알아봐야될듯..?
+
+- precon 직접 계산하는 방식으로 바꿔보면 달라질까?
+
+- blockfull_old은 예전의 Blockfull (recursive call) 방식에 Sec 3 (+Block1D BSGS)를 적용하는 버전. 시간 비교를 위해 만들었음
+
+
 ## TODO
 
 ### Writing
