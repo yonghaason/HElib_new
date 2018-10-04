@@ -135,7 +135,7 @@ public:
   // which can be overriden in special circumstances.
   virtual bool
   processDiagonal(vector<RX>& poly, long i,
-                  const EncryptedArrayDerived<type>& ea, long k) const = 0;
+                  const EncryptedArrayDerived<type>& ea) const = 0;
 
 };
 
@@ -156,7 +156,7 @@ public:
 
   bool
   processDiagonal(vector<RX>& poly, long i,
-                  const EncryptedArrayDerived<type>& ea, long k) const override;
+                  const EncryptedArrayDerived<type>& ea) const override;
 };
 
 //====================================
@@ -251,10 +251,11 @@ public:
   long dim;
   long D;
   long d;
+  bool native;
   long strategy;
-  long g;
 
   ConstMultiplierCache cache;
+  ConstMultiplierCache cache1; // only for non-native dimension
 
 
   // The constructor encodes all the constants for a given
@@ -276,7 +277,8 @@ public:
   // Upgrades encoded constants from zzX to DoubleCRT.
   void upgrade() override { 
     cache.upgrade(ea.getContext()); 
-    }
+    cache1.upgrade(ea.getContext()); 
+  }
 
   const EncryptedArray& getEA() const override { return ea; }
 };
@@ -330,7 +332,6 @@ public:
   bool minimal;
   std::vector<long> dims;
   std::vector<BlockMatMul1DExec> transforms;
-  
 
   // The constructor encodes all the constants for a given
   // matrix in zzX format.
@@ -383,9 +384,6 @@ extern int fhe_test_force_bsgs;
 // Controls whether or not we use BSGS multiplication.
 // 1 to force on, -1 to force off, 0 for default behaviour.
 
-extern int fhe_test_force_block_bsgs;
-// Controls whether or not we use BSGS multiplication for BlockMatMul1D.
-// 1 to force on, -1 to force off, 0 for default behaviour.
 
 extern int fhe_test_force_hoist;
 // Controls whether ot not we use hoisting.
