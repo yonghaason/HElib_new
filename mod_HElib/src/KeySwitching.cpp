@@ -416,7 +416,7 @@ void addNewBSGSMatrices(FHESecKey& sKey, long bound, long keyID)
     else
       addNewBSGSmats4dim(sKey, i, keyID);
   }
-  // sKey.setKeySwitchMap();
+  sKey.setKeySwitchMap();
 }
 
 static void recaddMatrices(FHESecKey& sKey, long dim, long enddim, long idx, long endidx, long keyID) {
