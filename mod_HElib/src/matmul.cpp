@@ -1578,7 +1578,7 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
           for (long j: range(first, last)) {
             for (long i: range(first_i, last_i)) {
               if(i+g*k>=D) break;
-              MulAdd(acc2[j+d*k], cache.multiplier[(i+g*k)*d1+j], *par_buf[i-first_i]);
+              MulAdd(acc_[j+d*k], cache.multiplier[(i+g*k)*d1+j], *par_buf[i-first_i]);
             }
           }
         }
