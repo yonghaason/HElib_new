@@ -30,8 +30,8 @@ long KSGiantStepSize(long D)
 long NewKSGiantStepSize(long D, long d)
 { 
   assert(D > 0 && d > 0);
-  long g = SqrRoot(D/d);
-  if (g*g < D/d) g++; // TODO: Necessary?
+  long g = SqrRoot(D*d);
+  if (g*g < D*d) g++; // TODO: Necessary?
   return g;
 }
 
@@ -393,14 +393,14 @@ static void addNewBSGSmats4dim(FHESecKey& sKey, long i, long keyID)
 
   // baby steps
   for (long j = 1; j < g; j++) {
-    for (long k = 0; k < ordP; k++) {
-      sKey.GenKeySWmatrix(1, MulMod(zMStar.genToPow(i, j), zMStar.genToPow(-1, k), m), keyID, keyID);
-    }
+      sKey.GenKeySWmatrix(1, zMStar.genToPow(i, j), keyID, keyID);
   }
   // giant steps
-  for (long j = g; j < ord; j += g)
-    sKey.GenKeySWmatrix(1, zMStar.genToPow(i, j), keyID, keyID);
-
+  for (long j = g; j < ord; j += g) {
+    for (long k = 0; k < ordP; k++) {
+    	sKey.GenKeySWmatrix(1, MulMod(zMStar.genToPow(i, j), zMStar.genToPow(-1, k), m), keyID, keyID);
+  	}
+  }
   sKey.setKSStrategy(i, FHE_KSS_NEW);
 }
 
@@ -416,7 +416,7 @@ void addNewBSGSMatrices(FHESecKey& sKey, long bound, long keyID)
     else
       addNewBSGSmats4dim(sKey, i, keyID);
   }
-  sKey.setKeySwitchMap();
+  // sKey.setKeySwitchMap();
 }
 
 static void recaddMatrices(FHESecKey& sKey, long dim, long enddim, long idx, long endidx, long keyID) {
