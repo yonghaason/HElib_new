@@ -117,7 +117,6 @@ ostream& operator<<(ostream& str, const KeySwitch& matrix);
 // We DO NOT have istream& operator>>(istream& str, KeySwitch& matrix);
 // instead must use the readMatrix method above, where you can specify context
 
-
 #define FHE_KSS_UNKNOWN (0)
 // unknown KS strategy
 
@@ -131,6 +130,11 @@ ostream& operator<<(ostream& str, const KeySwitch& matrix);
 // minimal strategy (for g_i, and for g_i^{-ord_i} for bad dims)
 
 #define FHE_KSS_NEW     (4)
+
+#define FHE_KSS_NEWFULL (5)
+
+#define FHE_KSS_ALL     (6)
+
 
 
 

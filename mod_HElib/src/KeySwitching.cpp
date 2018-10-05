@@ -31,6 +31,7 @@ long NewKSGiantStepSize(long D, long d)
 { 
   assert(D > 0 && d > 0);
   long g = SqrRoot(D*d);
+  // long g = 3*SqrRoot(D*d);
   if (g*g < D*d) g++; // TODO: Necessary?
   return g;
 }
@@ -46,6 +47,8 @@ void addAllMatrices(FHESecKey& sKey, long keyID)
     if (!context.zMStar.inZmStar(i)) continue;
     sKey.GenKeySWmatrix(1, i, keyID, keyID);
   }
+
+  sKey.setKSStrategy(0, FHE_KSS_ALL);
   sKey.setKeySwitchMap(); // re-compute the key-switching map
 }
 
@@ -436,7 +439,7 @@ static void recaddMatrices(FHESecKey& sKey, long dim, long enddim, long idx, lon
 			long tmp_idx = idx;
       tmp_idx *= zMStar.genToPow(dim, j);
       tmp_idx %= m;
-      if (idx != 1)
+      if (tmp_idx != 1)
         sKey.GenKeySWmatrix(1, tmp_idx, keyID, keyID);
 		}
 	}
@@ -458,6 +461,8 @@ void addNewFullBSGSMatrices(FHESecKey& sKey, long keyID)
 	long g = (ord[0] > fork) ? fork : ord[0];
 	for (long i = 1; i < g; i++)
     sKey.GenKeySWmatrix(1, zMStar.genToPow(0, i), keyID, keyID);
+
+  sKey.setKSStrategy(0, FHE_KSS_NEWFULL);
 
 	// giant steps
 	long enddim = 0;
