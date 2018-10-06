@@ -742,6 +742,7 @@ void GenBabySteps(vector<shared_ptr<Ctxt>>& v, const Ctxt& ctxt, long dim,
 
   if (fhe_test_force_hoist >= 0 &&
  		ctxt.getPubKey().getKSStrategy(dim) != FHE_KSS_UNKNOWN) {
+  	cout << "Hoisting on" << endl;
     BasicAutomorphPrecon precon(ctxt);
 
     NTL_EXEC_RANGE(n, first, last)
@@ -1538,50 +1539,53 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
 	   	//     for (long i: range(1, cnt)) acc[l] += acc2[i];   
 	    // }
 	    
- 	    // vector<shared_ptr<Ctxt>> baby_steps(g);
- 	    // GenBabySteps(baby_steps, ctxt, dim, true);
- 	    // for(long j: range(d)) {
- 	    // 	for(long k: range(h))	{
- 	    // 		for(long l: range(g)) {
- 	    // 			long i = g*k + l;
- 	    // 			if (i >= D) break;
- 	    // 			MulAdd(acc_[j+d*k], cache.multiplier[i*d+j], *baby_steps[l]);
- 	    // 		}
- 	    // 	}
- 	    // }
+
+	    // cout << "Use GenBabySteps ftn" << endl;
+ 	    vector<shared_ptr<Ctxt>> baby_steps(g);
+ 	    GenBabySteps(baby_steps, ctxt, dim, false);
+ 	    for(long j: range(d)) {
+ 	    	for(long k: range(h))	{
+ 	    		for(long l: range(g)) {
+ 	    			long i = g*k + l;
+ 	    			if (i >= D) break;
+ 	    			MulAdd(acc_[j+d*k], cache.multiplier[i*d+j], *baby_steps[l]);
+ 	    		}
+ 	    	}
+ 	    }
 
       
-      shared_ptr<GeneralAutomorphPrecon> precon =
-          buildGeneralAutomorphPrecon(ctxt, dim, ea);
+      // cout << "Build precon directly" << endl;
+      // shared_ptr<GeneralAutomorphPrecon> precon =
+      //     buildGeneralAutomorphPrecon(ctxt, dim, ea);
 
-      long par_buf_sz = 1;
-      if (AvailableThreads() > 1) 
-        par_buf_sz = min(g, par_buf_max);
+      // long par_buf_sz = 1;
+      // if (AvailableThreads() > 1) 
+      //   par_buf_sz = min(g, par_buf_max);
 
-      vector<shared_ptr<Ctxt>> par_buf(par_buf_sz);
+      // vector<shared_ptr<Ctxt>> par_buf(par_buf_sz);
 
-      for (long first_i = 0; first_i < g; first_i += par_buf_sz) {
-        long last_i = min(first_i + par_buf_sz, g);
+      // for (long first_i = 0; first_i < g; first_i += par_buf_sz) {
+      //   long last_i = min(first_i + par_buf_sz, g);
 
-        NTL_EXEC_RANGE(last_i-first_i, first, last) 
+      //   NTL_EXEC_RANGE(last_i-first_i, first, last) 
          
-        for (long idx: range(first, last)) {
-          long i = idx + first_i;
-          par_buf[idx] = precon->automorph(i);
-        }
-        NTL_EXEC_RANGE_END
+      //   for (long idx: range(first, last)) {
+      //     long i = idx + first_i;
+      //     par_buf[idx] = precon->automorph(i);
+      //   }
+      //   NTL_EXEC_RANGE_END
 
-        NTL_EXEC_RANGE(d1, first, last)
-        for(long k: range(h)) {
-          for (long j: range(first, last)) {
-            for (long i: range(first_i, last_i)) {
-              if(i+g*k>=D) break;
-              MulAdd(acc_[j+d*k], cache.multiplier[(i+g*k)*d1+j], *par_buf[i-first_i]);
-            }
-          }
-        }
-      NTL_EXEC_RANGE_END
-      }
+      //   NTL_EXEC_RANGE(d1, first, last)
+      //   for(long k: range(h)) {
+      //     for (long j: range(first, last)) {
+      //       for (long i: range(first_i, last_i)) {
+      //         if(i+g*k>=D) break;
+      //         MulAdd(acc_[j+d*k], cache.multiplier[(i+g*k)*d1+j], *par_buf[i-first_i]);
+      //       }
+      //     }
+      //   }
+      // NTL_EXEC_RANGE_END
+      // }
 
     }
 

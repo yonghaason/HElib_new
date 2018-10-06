@@ -31,7 +31,8 @@ long NewKSGiantStepSize(long D, long d)
 { 
   assert(D > 0 && d > 0);
   long g = SqrRoot(D*d);
-  // long g = 3*SqrRoot(D*d);
+  // long g = 128;
+  // long g = SqrRoot(D*d) + 30;
   if (g*g < D*d) g++; // TODO: Necessary?
   return g;
 }
