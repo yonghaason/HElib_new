@@ -262,6 +262,10 @@ buildGeneralAutomorphPrecon(const Ctxt& ctxt, long dim,
 
       case FHE_KSS_FULL:
 	return make_shared<GeneralAutomorphPrecon_FULL>(ctxt, dim, ea);
+
+      case FHE_KSS_NEW:
+      cout << "FHE_KSS_NEW" << endl;
+  return make_shared<GeneralAutomorphPrecon_FULL>(ctxt, dim, ea);      
 	
       default:
 	return make_shared<GeneralAutomorphPrecon_UNKNOWN>(ctxt, dim, ea);
@@ -1540,9 +1544,9 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
 	    // }
 	    
 
-	    // cout << "Use GenBabySteps ftn" << endl;
+	    cout << "Use GenBabySteps ftn" << endl;
  	    vector<shared_ptr<Ctxt>> baby_steps(g);
- 	    GenBabySteps(baby_steps, ctxt, dim, false);
+ 	    GenBabySteps(baby_steps, ctxt, dim, true);
  	    for(long j: range(d)) {
  	    	for(long k: range(h))	{
  	    		for(long l: range(g)) {
@@ -1553,7 +1557,6 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
  	    	}
  	    }
 
-      
       // cout << "Build precon directly" << endl;
       // shared_ptr<GeneralAutomorphPrecon> precon =
       //     buildGeneralAutomorphPrecon(ctxt, dim, ea);
@@ -1572,6 +1575,7 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
       //   for (long idx: range(first, last)) {
       //     long i = idx + first_i;
       //     par_buf[idx] = precon->automorph(i);
+      //     par_buf[idx]->cleanUp();
       //   }
       //   NTL_EXEC_RANGE_END
 
