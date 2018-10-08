@@ -53,7 +53,7 @@ bool DoTest(const Matrix& mat, const EncryptedArray& ea,
   FHE_NTIMER_START(Conv);
   mat_exec.upgrade();
   FHE_NTIMER_STOP(Conv);
-
+  
   // choose a random plaintext vector and encrypt it
   NewPlaintextArray v(ea);
   random(ea, v);
@@ -66,6 +66,7 @@ bool DoTest(const Matrix& mat, const EncryptedArray& ea,
   FHE_NTIMER_START(Linear_Trans);
   mat_exec.mul(ctxt);
   FHE_NTIMER_STOP(Linear_Trans);
+  cout << " ? ? " << endl;
 
   mul(v, mat);     // multiply the plaintext vector
 
