@@ -126,6 +126,13 @@ void TestIt(FHEcontext& context, long dim, bool verbose, long full, long block)
   case 6:
     addAllMatrices(secretKey);
     break;
+  case 7:
+    addMinimal1DMatrices(secretKey, New=true);
+    addMinimalFrbMatrices(secretKey);
+    break;
+  case 8:
+    addNewFullMinMatrices(secretKey);
+    break;
 
    default:
      Error("bad ks_strategy");

@@ -135,6 +135,9 @@ ostream& operator<<(ostream& str, const KeySwitch& matrix);
 
 #define FHE_KSS_ALL     (6)
 
+// minimal 
+#define FHE_KSS_NEWMIN  (7)
+
 
 
 
@@ -404,14 +407,16 @@ inline void addBSGSFrbMatrices(FHESecKey& sKey, long keyID=0)
 
 
 //! These routines just add a single matrix (or two, for bad dimensions)
-void addMinimal1DMatrices(FHESecKey& sKey, long keyID=0);
+void addMinimal1DMatrices(FHESecKey& sKey, long keyID=0, bool New=false);
 void addMinimalFrbMatrices(FHESecKey& sKey, long keyID=0);
 
 //! @brief Key Switching for our new 1D method
 void addNewBSGSMatrices(FHESecKey& sKey, long bound=FHE_KEYSWITCH_MIN_THRESH, long keyID=0);
 
-//! @brief Key Switching for our new full method
+//! @brief Key Switchings for our new full method
 void addNewFullBSGSMatrices(FHESecKey& sKey, long keyID=0);
+void addNewFullMinMatrices(FHESecKey& sKey, long keyID=0);
+
 
 //! Generate all key-switching matrices for a given permutation network
 class PermNetwork;
