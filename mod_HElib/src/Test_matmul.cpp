@@ -66,7 +66,6 @@ bool DoTest(const Matrix& mat, const EncryptedArray& ea,
   FHE_NTIMER_START(Linear_Trans);
   mat_exec.mul(ctxt);
   FHE_NTIMER_STOP(Linear_Trans);
-  cout << " ? ? " << endl;
 
   mul(v, mat);     // multiply the plaintext vector
 
@@ -127,11 +126,8 @@ void TestIt(FHEcontext& context, long dim, bool verbose, long full, long block)
     addAllMatrices(secretKey);
     break;
   case 7:
-    addMinimal1DMatrices(secretKey, New=true);
+    addMinimal1DMatrices(secretKey, 0, true);
     addMinimalFrbMatrices(secretKey);
-    break;
-  case 8:
-    addNewFullMinMatrices(secretKey);
     break;
 
    default:

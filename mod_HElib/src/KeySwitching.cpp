@@ -338,11 +338,12 @@ void addSomeFrbMatrices(FHESecKey& sKey, long bound, long keyID)
   sKey.setKeySwitchMap(); // re-compute the key-switching map
 }
 
-static void addMinimal1Dmats4dim(FHESecKey& sKey, long i, long keyID, bool New)
+static void addMinimal1Dmats4dim(FHESecKey& sKey, long i, long keyID, bool bias)
 {
   const PAlgebra& zMStar = sKey.getContext().zMStar;
   long ord;
   bool native;
+  long ordP = zMStar.getOrdP();
 
   if (i != -1) {
     ord = zMStar.OrderOf(i);
@@ -350,7 +351,7 @@ static void addMinimal1Dmats4dim(FHESecKey& sKey, long i, long keyID, bool New)
   }
   else {
     // Frobenius
-    ord = zMStar.getOrdP();
+    ord = ordP;
     native = true;
   }
   sKey.GenKeySWmatrix(1, zMStar.genToPow(i, 1), keyID, keyID);
@@ -359,23 +360,21 @@ static void addMinimal1Dmats4dim(FHESecKey& sKey, long i, long keyID, bool New)
     sKey.GenKeySWmatrix(1, zMStar.genToPow(i, -ord), keyID, keyID);
 
   if (ord > FHE_KEYSWITCH_MIN_THRESH) {
-    if (New) long g = NewKSGiantStepSize(ord);
-    else long g = KSGiantStepSize(ord);
+    long g = (bias) ? NewKSGiantStepSize(ord, ordP) : KSGiantStepSize(ord);
     sKey.GenKeySWmatrix(1, zMStar.genToPow(i, g), keyID, keyID);
   }
 
-  if (New) sKey.setKSStrategy(i, FHE_KSS_NEWMIN);
-  else sKey.setKSStrategy(i, FHE_KSS_MIN);
+  (bias) ? sKey.setKSStrategy(i, FHE_KSS_NEWMIN) : sKey.setKSStrategy(i, FHE_KSS_MIN);
 
 }
 
-void addMinimal1DMatrices(FHESecKey& sKey, long keyID, bool New)
+void addMinimal1DMatrices(FHESecKey& sKey, long keyID, bool bias)
 {
   const FHEcontext &context = sKey.getContext();
 
   // key-switching matrices for the automorphisms
   for (long i: range(context.zMStar.numOfGens())) {
-    addMinimal1Dmats4dim(sKey, i, keyID, New);
+    addMinimal1Dmats4dim(sKey, i, keyID, bias);
   }
   sKey.setKeySwitchMap(); // re-compute the key-switching map
 }
@@ -384,7 +383,7 @@ void addMinimal1DMatrices(FHESecKey& sKey, long keyID, bool New)
 void addMinimalFrbMatrices(FHESecKey& sKey, long keyID)
 {
   const FHEcontext &context = sKey.getContext();
-  addMinimal1Dmats4dim(sKey, -1, keyID, New);
+  addMinimal1Dmats4dim(sKey, -1, keyID, false);
   sKey.setKeySwitchMap(); // re-compute the key-switching map
 }
 
@@ -484,27 +483,6 @@ void addNewFullBSGSMatrices(FHESecKey& sKey, long keyID)
 	}
 
 	sKey.setKeySwitchMap();
-}
-
-// Minimal Matrices for New Full algorithm
-// Has only one (or two if dim order is large) matrices per dim
-void addNewFullMinMatrices(FHESecKey& sKey, long keyID)
-{
-  const PAlgebra& zMStar = sKey.getContext().zMStar;
-  long ord;
-  long ndims = zMStar.numOfGens();
-  for (long i = -1; i < ndims; i++) {
-    sKey.GenKeySWmatrix(1, zMStar.genToPow(i, 1), keyID, keyID);
-    ord = (i==-1) ? zMStar.getOrdP() : zMStar.OrderOf(i);
-    
-    if (ord > FHE_KEYSWITCH_MIN_THRESH) {
-      long g = KSGiantStepSize(ord);
-      sKey.GenKeySWmatrix(1, zMStar.genToPow(i, g), keyID, keyID);
-    }
-    sKey.setKSStrategy(i, FHE_KSS_NEWMIN);
-  }
-
-  sKey.setKeySwitchMap();
 }
 
 // Generate all key-switching matrices for a given permutation network

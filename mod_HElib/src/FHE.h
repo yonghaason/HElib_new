@@ -407,7 +407,7 @@ inline void addBSGSFrbMatrices(FHESecKey& sKey, long keyID=0)
 
 
 //! These routines just add a single matrix (or two, for bad dimensions)
-void addMinimal1DMatrices(FHESecKey& sKey, long keyID=0, bool New=false);
+void addMinimal1DMatrices(FHESecKey& sKey, long keyID=0, bool bias=false);
 void addMinimalFrbMatrices(FHESecKey& sKey, long keyID=0);
 
 //! @brief Key Switching for our new 1D method
@@ -415,7 +415,6 @@ void addNewBSGSMatrices(FHESecKey& sKey, long bound=FHE_KEYSWITCH_MIN_THRESH, lo
 
 //! @brief Key Switchings for our new full method
 void addNewFullBSGSMatrices(FHESecKey& sKey, long keyID=0);
-void addNewFullMinMatrices(FHESecKey& sKey, long keyID=0);
 
 
 //! Generate all key-switching matrices for a given permutation network

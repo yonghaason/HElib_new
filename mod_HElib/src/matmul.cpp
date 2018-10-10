@@ -746,7 +746,7 @@ void GenBabySteps(vector<shared_ptr<Ctxt>>& v, const Ctxt& ctxt, long dim,
 
   if (fhe_test_force_hoist >= 0 &&
  		ctxt.getPubKey().getKSStrategy(dim) != FHE_KSS_UNKNOWN) {
-  	cout << "Hoisting on" << endl;
+  	// cout << "Hoisting on" << endl;
     BasicAutomorphPrecon precon(ctxt);
 
     NTL_EXEC_RANGE(n, first, last)
@@ -1467,14 +1467,14 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
     iterative1 = true;
 
   bool iterative = false;
-  if (ctxt.getPubKey().getKSStrategy(dim1) == FHE_KSS_NEWMIN)
+  if (ctxt.getPubKey().getKSStrategy(dim0) == FHE_KSS_NEWMIN)
     iterative = true;
 
   vector<Ctxt> acc(d1, Ctxt(ZeroCtxtLike, ctxt));
   if (g) {
-    long h = divc(D, g);
-    vector<Ctxt> acc_(d*h, Ctxt(ZeroCtxtLike, ctxt));
+    long h = divc(d0, g);
     if (iterative) {
+      cout << "should print this" << endl;
       Ctxt sh_ctxt(ctxt);
       vector<Ctxt> baby_steps(g, Ctxt(ZeroCtxtLike, ctxt)); //// baby_steps[s] = rot(or sigma)^s(v) for j in [0..g).
       baby_steps[0] = ctxt;
@@ -1485,7 +1485,7 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
       }
 
       for (long j: range(d1)) {
-        for (long k = h-2; k >= 0; k--) {
+        for (long k = h-1; k >= 0; k--) {
           if (k < h-1) {
             acc[j].smartAutomorph(zMStar.genToPow(dim0, g));
             acc[j].cleanUp();
@@ -1507,26 +1507,25 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
       ctxt = sum;
     }
     else {
-    	long h = divc(D, g);
-    	vector<Ctxt> acc_(d*h, Ctxt(ZeroCtxtLike, ctxt));
+      vector<Ctxt> acc_(d1*h, Ctxt(ZeroCtxtLike, ctxt));
       // cout << "Use GenBabySteps ftn" << endl;
       vector<shared_ptr<Ctxt>> baby_steps(g);
-      GenBabySteps(baby_steps, ctxt, dim, true);
-      for(long j: range(d)) {
+      GenBabySteps(baby_steps, ctxt, dim0, true);
+      for(long j: range(d1)) {
       	for(long k: range(h))	{
       		for(long l: range(g)) {
       			long i = g*k + l;
-      			if (i >= D) break;
-      			MulAdd(acc_[j+d*k], cache.multiplier[i*d+j], *baby_steps[l]);
+      			if (i >= d0) break;
+      			MulAdd(acc_[j+d1*k], cache.multiplier[i*d1+j], *baby_steps[l]);
       		}
       	}
       }
 
   		Ctxt sum(ZeroCtxtLike, ctxt);	  
-  	  for(long j: range(d)) {
+  	  for(long j: range(d1)) {
   		  for(long k: range(h)) {
-  			  acc_[j+d*k].smartAutomorph(zMStar.genToPow(dim1, j)*zMStar.genToPow(dim0, g*k));
-  			  sum += acc_[j+d*k];
+  			  acc_[j+d1*k].smartAutomorph(zMStar.genToPow(dim1, j)*zMStar.genToPow(dim0, g*k));
+  			  sum += acc_[j+d1*k];
   		  }
   	  }
   	  ctxt = sum;
@@ -1545,57 +1544,57 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
         }
       }
     }
- 	  else { // hoisting
+ 	else { // hoisting
     	shared_ptr<GeneralAutomorphPrecon> precon = buildGeneralAutomorphPrecon(ctxt, dim0, ea);
     	long par_buf_sz = 1;
 
-      if (AvailableThreads() > 1) par_buf_sz = min(d0, par_buf_max);
+    	if (AvailableThreads() > 1) par_buf_sz = min(d0, par_buf_max);
 
-      vector<shared_ptr<Ctxt>> par_buf(par_buf_sz);
+    	vector<shared_ptr<Ctxt>> par_buf(par_buf_sz);
         
-      for (long first_i = 0; first_i < d0; first_i += par_buf_sz) {
-    	  long last_i = min(first_i + par_buf_sz, d0);
-    	  NTL_EXEC_RANGE(last_i-first_i, first, last) 
-    	  for (long idx: range(first, last)) {
-    	    long i = idx + first_i;
-    	    par_buf[idx] = precon->automorph(i);
-    	  }
-    	  NTL_EXEC_RANGE_END
+    	for (long first_i = 0; first_i < d0; first_i += par_buf_sz) {
+	    	long last_i = min(first_i + par_buf_sz, d0);
+	    	NTL_EXEC_RANGE(last_i-first_i, first, last) 
+	    	for (long idx: range(first, last)) {
+	    	    long i = idx + first_i;
+	    	    par_buf[idx] = precon->automorph(i);
+	    	}
+	    	NTL_EXEC_RANGE_END
 
-        NTL_EXEC_RANGE(d1, first, last)
-    	  for (long j: range(first, last)) {
-          for (long i: range(first_i, last_i)) {
-    	      MulAdd(acc[j], cache.multiplier[i*d1+j], *par_buf[i-first_i]);
-          }
-        }     
-    	NTL_EXEC_RANGE_END
-      } 
+	        NTL_EXEC_RANGE(d1, first, last)
+	    	  for (long j: range(first, last)) {
+	          for (long i: range(first_i, last_i)) {
+	    	      MulAdd(acc[j], cache.multiplier[i*d1+j], *par_buf[i-first_i]);
+	          }
+	        }     
+	    	NTL_EXEC_RANGE_END
+	    } 
     }
-	  if (iterative1) {
+	if (iterative1) {
 	    Ctxt sum(acc[d1-1]);
-	      for (long j = d1-2; j >= 0; j--) {
+	    for (long j = d1-2; j >= 0; j--) {
 	        sum.smartAutomorph(zMStar.genToPow(dim1, 1));
 	        sum.cleanUp();
 	        sum += acc[j];
-	      }
+	    }
 	    ctxt = sum;
-	  }
+	}
     else {
-      PartitionInfo pinfo(d1);
-      long cnt = pinfo.NumIntervals();
-      vector<Ctxt> sum(cnt, Ctxt(ZeroCtxtLike, ctxt));
+		PartitionInfo pinfo(d1);
+		long cnt = pinfo.NumIntervals();
+		vector<Ctxt> sum(cnt, Ctxt(ZeroCtxtLike, ctxt));
 
-      // for j in [0..d1)
-      NTL_EXEC_INDEX(cnt, index)
-      long first, last;
-      pinfo.interval(first, last, index);
-      for (long j: range(first, last)) {
-  	    if (j > 0) acc[j].smartAutomorph(zMStar.genToPow(dim1, j));
-        sum[index] += acc[j];
-      }
-      NTL_EXEC_INDEX_END
-  	  ctxt = sum[0];
-      for (long i: range(1, cnt)) ctxt += sum[i];
+		// for j in [0..d1)
+		NTL_EXEC_INDEX(cnt, index)
+		long first, last;
+		pinfo.interval(first, last, index);
+		for (long j: range(first, last)) {
+		    if (j > 0) acc[j].smartAutomorph(zMStar.genToPow(dim1, j));
+			sum[index] += acc[j];
+		}
+		NTL_EXEC_INDEX_END
+		ctxt = sum[0];
+		for (long i: range(1, cnt)) ctxt += sum[i];
   	}
   }   
 }
@@ -2127,9 +2126,7 @@ BlockMatMulFullExec::mul(Ctxt& ctxt) const
       }
     }
   }
-
-  ctxt = sum;
-  
+  ctxt = sum;  
 
 }
 
