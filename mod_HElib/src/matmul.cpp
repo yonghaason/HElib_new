@@ -1474,7 +1474,6 @@ BlockMatMul1DExec::mul(Ctxt& ctxt) const
   if (g) {
     long h = divc(d0, g);
     if (iterative) {
-      cout << "should print this" << endl;
       Ctxt sh_ctxt(ctxt);
       vector<Ctxt> baby_steps(g, Ctxt(ZeroCtxtLike, ctxt)); //// baby_steps[s] = rot(or sigma)^s(v) for j in [0..g).
       baby_steps[0] = ctxt;
