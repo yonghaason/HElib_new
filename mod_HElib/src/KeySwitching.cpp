@@ -492,13 +492,14 @@ void addNewFullBSGSMatrices(FHESecKey& sKey, long keyID)
    const PAlgebra& zMStar = sKey.getContext().zMStar;
    long ord;
    long ndims = zMStar.numOfGens();
+
    for (long i = -1; i < ndims; i++) {
      sKey.GenKeySWmatrix(1, zMStar.genToPow(i, 1), keyID, keyID);
      ord = (i==-1) ? zMStar.getOrdP() : zMStar.OrderOf(i);
-     
-     if (ord > FHE_KEYSWITCH_MIN_THRESH) {
-       long g = KSGiantStepSize(ord);
-       sKey.GenKeySWmatrix(1, zMStar.genToPow(i, g), keyID, keyID);
+     if (i==0){
+        long fork = SqrRoot(zMStar.getPhiM());
+        if (ord > fork)
+          sKey.GenKeySWmatrix(1, zMStar.genToPow(0, fork), keyID, keyID);
      }
      sKey.setKSStrategy(i, FHE_KSS_NFS);
    }
