@@ -485,6 +485,28 @@ void addNewFullBSGSMatrices(FHESecKey& sKey, long keyID)
 	sKey.setKeySwitchMap();
 }
 
+// Minimal Matrices for New Full algorithm
+ // Has only one (or two if dim order is large) matrices per dim
+ void addNewFullMinMatrices(FHESecKey& sKey, long keyID)
+ {
+   const PAlgebra& zMStar = sKey.getContext().zMStar;
+   long ord;
+   long ndims = zMStar.numOfGens();
+   for (long i = -1; i < ndims; i++) {
+     sKey.GenKeySWmatrix(1, zMStar.genToPow(i, 1), keyID, keyID);
+     ord = (i==-1) ? zMStar.getOrdP() : zMStar.OrderOf(i);
+     
+     if (ord > FHE_KEYSWITCH_MIN_THRESH) {
+       long g = KSGiantStepSize(ord);
+       sKey.GenKeySWmatrix(1, zMStar.genToPow(i, g), keyID, keyID);
+     }
+     sKey.setKSStrategy(i, FHE_KSS_NFS);
+   }
+
+   sKey.setKeySwitchMap();
+ }
+
+
 // Generate all key-switching matrices for a given permutation network
 void addMatrices4Network(FHESecKey& sKey, const PermNetwork& net, long keyID)
 {

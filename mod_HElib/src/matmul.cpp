@@ -264,8 +264,7 @@ buildGeneralAutomorphPrecon(const Ctxt& ctxt, long dim,
 	return make_shared<GeneralAutomorphPrecon_FULL>(ctxt, dim, ea);
 
       case FHE_KSS_NEW:
-      cout << "FHE_KSS_NEW" << endl;
-  return make_shared<GeneralAutomorphPrecon_FULL>(ctxt, dim, ea);      
+  	return make_shared<GeneralAutomorphPrecon_FULL>(ctxt, dim, ea);      
 	
       default:
 	return make_shared<GeneralAutomorphPrecon_UNKNOWN>(ctxt, dim, ea);
@@ -2082,6 +2081,7 @@ BlockMatMulFullExec::mul(Ctxt& ctxt) const
 {
   FHE_NTIMER_START(mul_BlockMatMulFullExec);
   assert(&ea.getContext() == &ctxt.getContext());
+  const PAlgebra& zMStar = ea.getPAlgebra();
 
   assert(ea.size() > 1);
   // FIXME: right now, the code does not work if ea.size() == 1
@@ -2094,38 +2094,110 @@ BlockMatMulFullExec::mul(Ctxt& ctxt) const
   long d = ea.getDegree();
   long h = divc(D1, g);
   long phim = ea.getPAlgebra().getPhiM();
-  long m = ea.getPAlgebra().getM();
-
-  vector<shared_ptr<Ctxt>> baby_steps(g);
-  GenBabySteps(baby_steps, ctxt, 0, true);
-  vector<Ctxt> acc(phim*h/D1, Ctxt(ZeroCtxtLike, ctxt));
-  Ctxt sum(ZeroCtxtLike, ctxt);   
-  long ndims = ea.dimension();
+  long m = ea.getPAlgebra().getM(); 
+  long ndims = ea.dimension(); 
   
-  for (long idx: range(phim/(D1*d))) { 
-    for (long j: range(d)) {
-      for (long k: range(h)) {   
-        long temp_idx = idx;
-        long product = 1;
-        for (long ii: range(ndims-1)) {
-          product *= ea.getPAlgebra().genToPow(ii+1,temp_idx%dimSz(ea, ii+1));
-          product %= m;
-          temp_idx /= dimSz(ea, ii+1);
-        }
-        product *= ea.getPAlgebra().genToPow(-1, j)*ea.getPAlgebra().genToPow(0, g*k);
-        product %= m;
-        for(long l: range(g)) {
-          long i = g*k + l;
-          if(i >= D1) break;
-          MulAdd(acc[idx*d*h + j*h + k], cache[idx].multiplier[i*d+j], *baby_steps[l]);
-        }
-        acc[idx*d*h + j*h + k].smartAutomorph(product);
-        sum += acc[idx*d*h + j*h + k];
-        
-      }
+	bool iterative = false;
+  	if (ctxt.getPubKey().getKSStrategy(0) == FHE_KSS_NFS)
+    	iterative = true;
+
+    if (iterative) {
+		Ctxt sh_ctxt(ctxt);
+		vector<Ctxt> baby_steps(g, Ctxt(ZeroCtxtLike, ctxt)); //// baby_steps[s] = rot(or sigma)^s(v) for j in [0..g).
+		baby_steps[0] = ctxt;
+		for (long s: range(1, g)) {
+			baby_steps[s] = baby_steps[s-1];
+			baby_steps[s].smartAutomorph(zMStar.genToPow(0, 1)); 
+			baby_steps[s].cleanUp();
+		}
+
+		long lenacc = phim/D1;
+		vector<Ctxt> acc(lenacc, Ctxt(ZeroCtxtLike, ctxt));
+		if (g != D1) {	
+			for (long idx: range(lenacc/d)) {
+				for (long j: range(d)) {
+					for (long k = h-1; k >= 0; k--) {
+						if (k < h-1) {
+							acc[j*lenacc/d+idx].smartAutomorph(zMStar.genToPow(0, g));
+							acc[j*lenacc/d+idx].cleanUp();
+						}
+						for (long s: range(g)) {
+							long i = s + g*k;
+							if (i >= D1) break;
+							MulAdd(acc[j*lenacc/d+idx], cache[idx].multiplier[i*d+j], baby_steps[s]); 
+						}
+					}
+				}
+			}
+		}
+		else {
+			for (long idx: range(lenacc/d)) {
+				for (long i: range(D1)) {
+					for (long j: range(d)) {
+						MulAdd(acc[j*lenacc/d+idx], cache[idx].multiplier[i*d+j], baby_steps[i]);
+					}
+				}	
+			}
+		}
+
+		vector<Ctxt> acc_old = acc;
+		vector<Ctxt> acc_fin;
+		for (long dim=1; dim < ndims; dim++) {
+			long dimsz = dimSz(ea,dim);
+			vector<Ctxt> acc_next(lenacc/dimsz, Ctxt(ZeroCtxtLike, ctxt));
+			for (long j=lenacc-1; j>=0; j--) {
+				if (j%dimsz < dimsz-1) {
+					acc_next[j/dimsz].smartAutomorph(zMStar.genToPow(dim, 1));
+					acc_next[j/dimsz].cleanUp();
+				}
+				acc_next[j/dimsz] += acc_old[j];
+			}
+			acc_old = acc_next;
+			lenacc /= dimsz;
+
+			if (dim == ndims-1) acc_fin = acc_next;
+		}
+
+		Ctxt sum(acc_fin[d-1]);
+		for (long j = d-2; j >= 0; j--) {
+			sum.smartAutomorph(zMStar.genToPow(-1, 1));
+			sum.cleanUp();
+			sum += acc_fin[j];
+		}
+		ctxt = sum;
     }
-  }
-  ctxt = sum;  
+    else {
+		vector<shared_ptr<Ctxt>> baby_steps(g);
+		GenBabySteps(baby_steps, ctxt, 0, true);
+		vector<Ctxt> acc(phim*h/D1, Ctxt(ZeroCtxtLike, ctxt));
+		Ctxt sum(ZeroCtxtLike, ctxt);
+
+		for (long idx: range(phim/(D1*d))) { 
+			for (long j: range(d)) {
+				for (long k: range(h)) {   
+					long temp_idx = idx;
+					long product = 1;
+					for (long ii: range(ndims-1)) {
+		  				product *= ea.getPAlgebra().genToPow(ii+1,temp_idx%dimSz(ea, ii+1));
+						product %= m;
+						temp_idx /= dimSz(ea, ii+1);
+					}
+					product *= ea.getPAlgebra().genToPow(-1, j)*ea.getPAlgebra().genToPow(0, g*k);
+					product %= m;
+					for(long l: range(g)) {
+		  				long i = g*k + l;
+		  				if(i >= D1) break;
+		  				MulAdd(acc[idx*d*h + j*h + k], cache[idx].multiplier[i*d+j], *baby_steps[l]);
+					}
+					acc[idx*d*h + j*h + k].smartAutomorph(product);
+					sum += acc[idx*d*h + j*h + k];
+				}
+			}
+		}
+		ctxt = sum;
+    }
+
+
 
 }
 

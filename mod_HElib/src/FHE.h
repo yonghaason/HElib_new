@@ -138,6 +138,8 @@ ostream& operator<<(ostream& str, const KeySwitch& matrix);
 // minimal 
 #define FHE_KSS_NEWMIN  (7)
 
+#define FHE_KSS_NFS     (8)
+
 
 
 
@@ -415,6 +417,7 @@ void addNewBSGSMatrices(FHESecKey& sKey, long bound=FHE_KEYSWITCH_MIN_THRESH, lo
 
 //! @brief Key Switchings for our new full method
 void addNewFullBSGSMatrices(FHESecKey& sKey, long keyID=0);
+void addNewFullMinMatrices(FHESecKey& sKey, long keyID=0);
 
 
 //! Generate all key-switching matrices for a given permutation network
