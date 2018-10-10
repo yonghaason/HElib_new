@@ -30,9 +30,9 @@ long KSGiantStepSize(long D)
 long NewKSGiantStepSize(long D, long d)
 { 
   assert(D > 0 && d > 0);
-  long g = SqrRoot(D*d);
+  // long g = SqrRoot(D*d);
   // long g = 128;
-  // long g = SqrRoot(D*d) + 30;
+  long g = SqrRoot(D*d)*3/4;
   if (g*g < D*d) g++; // TODO: Necessary?
   return g;
 }
@@ -402,11 +402,18 @@ static void addNewBSGSmats4dim(FHESecKey& sKey, long i, long keyID)
       sKey.GenKeySWmatrix(1, zMStar.genToPow(i, j), keyID, keyID);
   }
   // giant steps
+  // for (long j = g; j < ord; j += g) {
+  //   for (long k = 0; k < ordP; k++) {
+  //     sKey.GenKeySWmatrix(1, MulMod(zMStar.genToPow(i, j), zMStar.genToPow(-1, k), m), keyID, keyID);
+  //   }
+  // }
   for (long j = g; j < ord; j += g) {
-    for (long k = 0; k < ordP; k++) {
-      sKey.GenKeySWmatrix(1, MulMod(zMStar.genToPow(i, j), zMStar.genToPow(-1, k), m), keyID, keyID);
-    }
+    sKey.GenKeySWmatrix(1, zMStar.genToPow(i, j), keyID, keyID);
   }
+  for (long k = 0; k < ordP; k++) {
+    sKey.GenKeySWmatrix(1, zMStar.genToPow(-1, k), keyID, keyID);
+  }
+
   sKey.setKSStrategy(i, FHE_KSS_NEW);
 }
 
