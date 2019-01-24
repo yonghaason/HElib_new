@@ -1,9 +1,20 @@
 Our Modified HElib
 =====
-This folder is for the submission of PKC'19.
+This folder is for a submission.
 
-Below are the original Readme.
+***Changed files:***
+- 'matmul.cpp' and 'matmul.h'
+- 'Test_matmul.cpp'
+- 'PAlgebra.cpp' and 'PAlgebra.h'
+- 'EncryptedArray.h'
+- 'KeySwitching.cpp'
+- 'FHE.h'
+
+Below is the original Readme.
+
 -----------------------------------------------------------------------------
+***January 2019:*** Multiple changes: CKKS support, new modulus-chain implementation, better noise management, etc. Documented in [changes.md](changes.md)
+
 ***March 2018:*** Re-implementation of homomorphic linear transformations, featuring speedups of 15x to 75x.
 
 ***Dec 2017-Jan 2018:*** Added some routines for addition/multiplication and
